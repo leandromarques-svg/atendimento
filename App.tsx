@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area
+  AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import {
   Users, Ticket, Clock, Activity, TrendingUp, Filter,
@@ -61,7 +61,7 @@ const App: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
 
   // IA State
-  const [insights, setInsights] = useState<string>('');
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +78,7 @@ const App: React.FC = () => {
           if (parsed && parsed.length > 0) {
             setData(parsed);
             setCurrentPage(1);
-            setInsights('');
+            setAiAnalysis(null);
           } else {
             alert("Nenhum registro válido encontrado no CSV.");
           }
@@ -307,26 +307,44 @@ const App: React.FC = () => {
         Pico de Atendimento (Heatmap): ${heatmapData.peak.day} às ${heatmapData.peak.hour}h (${heatmapData.peak.count} tickets)
       `;
 
-      const prompt = `Como um Especialista em Operações de Suporte e Customer Experience, analise estes dados e gere um relatório executivo estratégico:
+      const prompt = `Como um Especialista em Operações de Suporte e Customer Experience, analise estes dados e gere um relatório executivo estratégico.
 
-      1. **Análise do Período e Volumetria**: Visão geral do volume no período de ${minDate} a ${maxDate} e o que isso indica sobre a demanda.
-      2. **Performance de Time**: Analise o desempenho dos principais agentes (${topAgents}) e como equilibrar a carga.
-      3. **Gargalos Operacionais**: Por que a categoria "${topTimeCat?.name}" é a mais demorada? Relacione com o pico de atendimento (${heatmapData.peak.day}, ${heatmapData.peak.hour}h).
-      4. **Mapa de Calor & Escala**: O pico de tickets ocorre em ${heatmapData.peak.day} às ${heatmapData.peak.hour}h. Sugira como otimizar a escala de trabalho.
-      5. **Plano de Ação (3 Passos)**: Sugestões práticas e imediatas para reduzir TMA e melhorar CSAT.
+      IMPORTANTE: Responda APENAS com um JSON válido (sem markdown code blocks) seguindo EXATAMENTE esta estrutura:
+      {
+        "period_analysis": "Texto resumido sobre o volume e demanda do período",
+        "team_performance": "Análise sobre os agentes destaque e distribuição",
+        "bottlenecks": "Explicação sobre a categoria mais demorada e impacto",
+        "heatmap_analysis": "Análise do horário de pico e sugestão de escala",
+        "action_plan": ["Ação 1 curta e direta", "Ação 2 curta e direta", "Ação 3 curta e direta"]
+      }
 
-      Dados: ${summary}
-      Responda em Português com formatação Markdown rica (negrito, listas). Seja direto e orientado a dados.`;
+      Dados para análise: ${summary}`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.0-flash-exp',
         contents: prompt,
       });
 
-      setInsights(response.text || 'Ocorreu um erro ao processar os dados.');
+      const text = response.text || '{}';
+      // Remover code blocks se a IA colocá-los
+      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+      try {
+        const json = JSON.parse(cleanJson);
+        setAiAnalysis(json);
+      } catch (e) {
+        console.error("JSON Parse Error", e);
+        setAiAnalysis({
+          period_analysis: "Não foi possível estruturar a análise. Tente novamente.",
+          team_performance: "-",
+          bottlenecks: "-",
+          heatmap_analysis: "-",
+          action_plan: ["Erro na geração. Verifique os dados."]
+        });
+      }
     } catch (err) {
       console.error('Gemini API Error:', err);
-      setInsights('Erro ao conectar com a IA. Verifique sua chave de API.');
+      alert('Erro ao conectar com a IA. Verifique sua chave de API.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -496,18 +514,33 @@ const App: React.FC = () => {
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Top Categorias</h3>
-                <div className="space-y-3">
-                  {(metrics?.categories || []).slice(0, 15).map((cat, idx) => (
-                    <div key={cat.name} className="flex items-center justify-between text-[11px] py-1 border-b border-slate-50">
-                      <span className="text-slate-600 font-bold truncate max-w-[150px]">{cat.name}</span>
-                      <div className="flex gap-4">
-                        <span className="font-black text-emerald-600 w-8 text-center">{cat.FRESH}</span>
-                        <span className="font-black text-indigo-600 w-8 text-center">{cat.BLIP}</span>
-                      </div>
-                    </div>
-                  ))}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Participação por Categoria (Top 5)</h3>
+                <div className="flex-1 min-h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={(metrics?.categories || []).slice(0, 5)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {(metrics?.categories || []).slice(0, 5).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                      <Legend
+                        layout="horizontal"
+                        verticalAlign="bottom"
+                        align="center"
+                        wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>
@@ -559,23 +592,49 @@ const App: React.FC = () => {
                   <p className="text-slate-400 text-sm font-medium">Diagnóstico de eficiência e sugestões de melhoria.</p>
                 </div>
               </div>
-              {!insights ? (
-                <div className="flex flex-col items-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+              {!aiAnalysis ? (
+                <div className="flex flex-col items-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200 relative z-10">
                   <Target size={48} className="text-slate-200 mb-6" />
                   <p className="text-slate-400 font-bold text-center max-w-sm mb-8">Baseado nos dados atuais, a IA irá gerar um plano de ação para otimizar seus KPIs.</p>
                   <button disabled={isGeneratingInsights} onClick={generateAIInsights} className="flex items-center gap-3 px-8 py-4 bg-[#3f2666] text-white rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                    {isGeneratingInsights ? <><div className="loader border-white border-t-transparent"></div> Analisando...</> : <><Lightbulb size={20} /> Gerar Diagnóstico</>}
+                    {isGeneratingInsights ? <><div className="loader border-white border-t-transparent"></div> Analisando Dados...</> : <><Lightbulb size={20} /> Gerar Diagnóstico</>}
                   </button>
                 </div>
               ) : (
-                <div className="space-y-8 animate-in">
-                  <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-                    <ReactMarkdown className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                      {insights}
-                    </ReactMarkdown>
+                <div className="space-y-8 animate-in relative z-10">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Calendar size={14} /> Análise de Período</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.period_analysis}</p>
+                    </div>
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14} /> Performance de Time</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.team_performance}</p>
+                    </div>
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Activity size={14} /> Gargalos (Categorias)</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.bottlenecks}</p>
+                    </div>
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Clock size={14} /> Mapa de Calor</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.heatmap_analysis}</p>
+                    </div>
                   </div>
+
+                  <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100">
+                    <h3 className="text-sm font-black text-emerald-800 uppercase tracking-widest mb-6 flex items-center gap-2"><Target size={18} /> Plano de Ação Recomendado</h3>
+                    <div className="grid gap-4">
+                      {aiAnalysis.action_plan?.map((action: string, idx: number) => (
+                        <div key={idx} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-black text-sm shrink-0">{idx + 1}</div>
+                          <p className="text-sm text-slate-700 font-medium pt-1.5">{action}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex justify-center pt-6">
-                    <button onClick={() => { setInsights(''); generateAIInsights(); }} className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black shadow-sm hover:bg-slate-50 hover:text-[#3f2666] hover:border-[#3f2666]/20 transition-all">
+                    <button onClick={() => { setAiAnalysis(null); generateAIInsights(); }} className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black shadow-sm hover:bg-slate-50 hover:text-[#3f2666] hover:border-[#3f2666]/20 transition-all">
                       <Target size={16} /> Recalcular Insights
                     </button>
                   </div>
