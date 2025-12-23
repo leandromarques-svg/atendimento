@@ -48,11 +48,13 @@ const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', '
 
 const App: React.FC = () => {
   const [data, setData] = useState<TicketData[]>([]);
-  const [view, setView] = useState<'dashboard' | 'table' | 'insights'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'table' | 'insights' | 'agents'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState<'ALL' | 'FRESH' | 'BLIP'>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedAgent, setSelectedAgent] = useState<string>('ALL');
+  const [selectedQueue, setSelectedQueue] = useState<string>('ALL');
+  const [selectedClient, setSelectedClient] = useState<string>('ALL');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
