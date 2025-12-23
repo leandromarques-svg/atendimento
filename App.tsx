@@ -517,30 +517,30 @@ const App: React.FC = () => {
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                 <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Participação por Categoria</h3>
                 <div className="flex-1 min-h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={metrics?.categories || []}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {(metrics?.categories || []).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                      <Legend
-                        layout="horizontal"
-                        verticalAlign="bottom"
-                        align="center"
-                        wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="h-full overflow-y-auto pr-2 custom-scrollbar">
+                    <div style={{ height: Math.max(400, (metrics?.categories.length || 0) * 35) + 'px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          layout="vertical"
+                          data={metrics?.categories || []}
+                          margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            cursor={{ fill: '#f8fafc' }}
+                          />
+                          <Bar dataKey="value" name="Volume" radius={[0, 4, 4, 0]} barSize={16}>
+                            {(metrics?.categories || []).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
