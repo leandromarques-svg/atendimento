@@ -1,3 +1,13 @@
+// Endpoint para listar modelos disponíveis
+app.get('/api/gemini-models', async (req, res) => {
+  try {
+    const models = await genAI.listModels();
+    res.json(models);
+  } catch (err) {
+    console.error('Erro ao listar modelos Gemini:', err);
+    res.status(500).json({ error: err.message || 'Erro desconhecido' });
+  }
+});
 // Backend simples para proxy Gemini API
 const express = require('express');
 const cors = require('cors');
