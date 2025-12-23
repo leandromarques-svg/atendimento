@@ -44,6 +44,8 @@ const FooterLogo = () => (
   </svg>
 );
 
+const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
 const App: React.FC = () => {
   const [data, setData] = useState<TicketData[]>([]);
   const [view, setView] = useState<'dashboard' | 'table' | 'insights'>('dashboard');
@@ -54,6 +56,7 @@ const App: React.FC = () => {
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -88,48 +91,9 @@ const App: React.FC = () => {
     }
   };
 
-  const generateAIInsights = async () => {
-    if (filteredData.length === 0) return;
-    setIsGeneratingInsights(true);
 
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-      // Encontrar categoria que consome mais tempo médio
-      const catTimeSorted = [...(metrics?.categories || [])].sort((a, b) => (b.totalAHT / b.value) - (a.totalAHT / a.value));
-      const topTimeCat = catTimeSorted[0];
 
-      const summary = `
-        Contexto: Comparativo Freshdesk vs Blip
-        Total Tickets Filtrados: ${filteredData.length}
-        TMA Geral: ${metrics ? formatSecondsToTime(metrics.avgAHT) : 'N/A'}
-        Agente Destaque (Volume): ${metrics?.agents[0]?.name} (${metrics?.agents[0]?.total} tickets)
-        Categoria Maior Volumetria: ${metrics?.categories[0]?.name} (${metrics?.categories[0]?.value} tickets)
-        Categoria que consome MAIS TEMPO (Média): ${topTimeCat?.name} (${formatSecondsToTime(topTimeCat?.totalAHT / topTimeCat?.value)})
-      `;
-
-      const prompt = `Como um Especialista em Operações de Suporte, analise estes dados e gere um insight estratégico estruturado:
-      1. **Destaque do Agente**: Quem é o líder de produtividade e o que isso impacta.
-      2. **Análise de Categorias**: Por que a categoria "${topTimeCat?.name}" está consumindo tanto tempo e qual a relação com a volumetria.
-      3. **Diagnóstico Operacional**: Avalie a eficiência geral com base no volume e TMA.
-      4. **Plano de Ação**: 3 sugestões práticas para reduzir o TMA e melhorar a escalabilidade.
-      
-      Dados: ${summary}
-      Responda em Português com tom executivo e use Markdown.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      setInsights(response.text || 'Ocorreu um erro ao processar os dados.');
-    } catch (err) {
-      console.error('Gemini API Error:', err);
-      setInsights('Erro ao conectar com a IA. Verifique sua chave de API.');
-    } finally {
-      setIsGeneratingInsights(false);
-    }
-  };
 
   const exportToPDF = async () => {
     if (!dashboardRef.current || data.length === 0) return;
@@ -224,13 +188,42 @@ const App: React.FC = () => {
       const matchesCategory = selectedCategory === 'ALL' || d.categoria === selectedCategory;
       const matchesAgent = selectedAgent === 'ALL' || d.agente === selectedAgent;
       const matchesYear = selectedYear === 'ALL' || d.dataObj.getFullYear().toString() === selectedYear;
+      const matchesMonth = selectedMonth === 'ALL' || d.dataObj.getMonth().toString() === selectedMonth;
+
       const ticketDate = d.dataObj;
       const start = dateStart ? new Date(dateStart + 'T00:00:00') : null;
       const end = dateEnd ? new Date(dateEnd + 'T23:59:59') : null;
       const matchesDate = (!start || ticketDate >= start) && (!end || ticketDate <= end);
-      return matchesSearch && matchesPlatform && matchesCategory && matchesAgent && matchesDate && matchesYear;
+
+      return matchesSearch && matchesPlatform && matchesCategory && matchesAgent && matchesDate && matchesYear && matchesMonth;
     });
-  }, [data, searchTerm, platformFilter, selectedCategory, selectedAgent, dateStart, dateEnd, selectedYear]);
+  }, [data, searchTerm, platformFilter, selectedCategory, selectedAgent, dateStart, dateEnd, selectedYear, selectedMonth]);
+
+  const heatmapData = useMemo(() => {
+    // 7 days x 24 hours
+    const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+    let max = 0;
+    let peakDay = 0;
+    let peakHour = 0;
+
+    filteredData.forEach(d => {
+      if (!d.dataObj) return;
+      const day = d.dataObj.getDay(); // 0 = Dom, 6 = Sab
+      // Ajustar para 0=Seg, ..., 6=Dom
+      const adjDay = day === 0 ? 6 : day - 1;
+      const hour = d.dataObj.getHours();
+
+      grid[adjDay][hour]++;
+      if (grid[adjDay][hour] > max) {
+        max = grid[adjDay][hour];
+        peakDay = adjDay;
+        peakHour = hour;
+      }
+    });
+
+    const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+    return { grid, max, peak: { day: days[peakDay], hour: peakHour, count: max } };
+  }, [filteredData]);
 
   const metrics = useMemo(() => {
     if (filteredData.length === 0) return null;
@@ -281,6 +274,63 @@ const App: React.FC = () => {
     });
     return grouped;
   }, [filteredData]);
+
+  const generateAIInsights = async () => {
+    if (filteredData.length === 0) return;
+    setIsGeneratingInsights(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
+      // Encontrar categoria que consome mais tempo médio
+      const catTimeSorted = [...(metrics?.categories || [])].sort((a, b) => (b.totalAHT / b.value) - (a.totalAHT / a.value));
+      const topTimeCat = catTimeSorted[0];
+
+      // Top 3 Agentes
+      const topAgents = metrics?.agents.slice(0, 3).map(a => `${a.name} (${a.total})`).join(', ');
+
+      // Periodo
+      const dates = filteredData.map(d => d.dataObj.getTime());
+      const minDate = new Date(Math.min(...dates) || Date.now()).toLocaleDateString('pt-BR');
+      const maxDate = new Date(Math.max(...dates) || Date.now()).toLocaleDateString('pt-BR');
+
+      const summary = `
+        Contexto: Análise de Atendimento (Freshdesk vs Blip)
+        Período Analisado: ${minDate} a ${maxDate}
+        Total Tickets Filtrados: ${filteredData.length}
+        TMA Geral: ${metrics ? formatSecondsToTime(metrics.avgAHT) : 'N/A'}
+        
+        Agentes Destaque (Volume): ${topAgents}
+        Categoria Maior Volumetria: ${metrics?.categories[0]?.name} (${metrics?.categories[0]?.value} tickets)
+        Categoria Maior Tempo (Média): ${topTimeCat?.name} (${formatSecondsToTime(topTimeCat?.totalAHT / topTimeCat?.value)})
+        
+        Pico de Atendimento (Heatmap): ${heatmapData.peak.day} às ${heatmapData.peak.hour}h (${heatmapData.peak.count} tickets)
+      `;
+
+      const prompt = `Como um Especialista em Operações de Suporte e Customer Experience, analise estes dados e gere um relatório executivo estratégico:
+
+      1. **Análise do Período e Volumetria**: Visão geral do volume no período de ${minDate} a ${maxDate} e o que isso indica sobre a demanda.
+      2. **Performance de Time**: Analise o desempenho dos principais agentes (${topAgents}) e como equilibrar a carga.
+      3. **Gargalos Operacionais**: Por que a categoria "${topTimeCat?.name}" é a mais demorada? Relacione com o pico de atendimento (${heatmapData.peak.day}, ${heatmapData.peak.hour}h).
+      4. **Mapa de Calor & Escala**: O pico de tickets ocorre em ${heatmapData.peak.day} às ${heatmapData.peak.hour}h. Sugira como otimizar a escala de trabalho.
+      5. **Plano de Ação (3 Passos)**: Sugestões práticas e imediatas para reduzir TMA e melhorar CSAT.
+
+      Dados: ${summary}
+      Responda em Português com formatação Markdown rica (negrito, listas). Seja direto e orientado a dados.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash-exp',
+        contents: prompt,
+      });
+
+      setInsights(response.text || 'Ocorreu um erro ao processar os dados.');
+    } catch (err) {
+      console.error('Gemini API Error:', err);
+      setInsights('Erro ao conectar com a IA. Verifique sua chave de API.');
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
 
   const paginatedData = filteredData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
@@ -339,6 +389,10 @@ const App: React.FC = () => {
             <option value="ALL">Anos: Todos</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+            <option value="ALL">Mês: Todos</option>
+            {MONTHS.map((m, i) => <option key={i} value={i.toString()}>{m}</option>)}
+          </select>
           <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 ml-auto">
             <Calendar size={12} className="text-slate-400" />
             <input type="date" className="bg-transparent text-[10px] font-bold outline-none" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
@@ -363,23 +417,70 @@ const App: React.FC = () => {
               <StatCard title="TMR Médio" value={metrics ? formatSecondsToTime(metrics.avgFRT) : '00:00:00'} icon={<Activity className="text-blue-500" size={18} />} subValue="Tempo Resposta" />
               <StatCard title="Agentes" value={metrics ? metrics.agents.length : 0} icon={<Users className="text-amber-500" size={18} />} subValue="Ativos no período" />
             </section>
-            <section className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
-                <TrendingUp size={16} /> Evolução Mensal de Volume
-              </h3>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyEvolutionData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="FRESH_count" name="Freshdesk" stroke={FRESH_COLOR} fill={FRESH_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'BLIP'} />
-                    <Area type="monotone" dataKey="BLIP_count" name="Blip" stroke={BLIP_COLOR} fill={BLIP_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'FRESH'} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <section className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
+                  <TrendingUp size={16} /> Evolução Mensal de Volume
+                </h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyEvolutionData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="FRESH_count" name="Freshdesk" stroke={FRESH_COLOR} fill={FRESH_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'BLIP'} />
+                      <Area type="monotone" dataKey="BLIP_count" name="Blip" stroke={BLIP_COLOR} fill={BLIP_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'FRESH'} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+
+              <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <Activity size={14} /> Mapa de Calor Semanal
+                </h3>
+                <div className="flex flex-col gap-1">
+                  <div className="flex text-[9px] text-slate-400 font-bold mb-1 pl-8">
+                    <span className="flex-1 text-center">00h</span>
+                    <span className="flex-1 text-center">06h</span>
+                    <span className="flex-1 text-center">12h</span>
+                    <span className="flex-1 text-center">18h</span>
+                  </div>
+                  {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, dayIdx) => (
+                    <div key={d} className="flex items-center gap-1">
+                      <div className="w-8 text-[9px] font-bold text-slate-500">{d}</div>
+                      <div className="flex-1 grid gap-px" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
+                        {heatmapData.grid[dayIdx].map((val, hourIdx) => {
+                          const opacity = heatmapData.max > 0 ? (val / heatmapData.max) : 0;
+                          return (
+                            <div
+                              key={hourIdx}
+                              className="h-6 rounded-sm transition-all hover:scale-125 cursor-help"
+                              style={{
+                                backgroundColor: BRAND_COLOR,
+                                opacity: Math.max(0.05, opacity),
+                                flex: 1
+                              }}
+                              title={`${d} ${hourIdx}h: ${val} tickets`}
+                            ></div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center mt-3">
+                    <span className="text-[9px] text-slate-400">Menor Volume</span>
+                    <div className="flex gap-1">
+                      {[0.1, 0.3, 0.6, 1].map(o => <div key={o} style={{ opacity: o }} className="w-4 h-4 bg-[#3f2666] rounded-sm"></div>)}
+                    </div>
+                    <span className="text-[9px] text-slate-400">Maior Volume</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Performance por Agente (Volume)</h3>
