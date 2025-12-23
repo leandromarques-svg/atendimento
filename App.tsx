@@ -443,8 +443,8 @@ const App: React.FC = () => {
 
       console.log('[IA] Prompt enviado:', prompt);
 
-      // Chamada ao backend
-      const response = await fetch('http://localhost:3030/api/gemini', {
+      // Chamada ao backend (porta 3031)
+      const response = await fetch('http://localhost:3031/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt })

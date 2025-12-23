@@ -32,7 +32,7 @@ app.post('/api/gemini', async (req, res) => {
   }
 });
 
-const PORT = 3030;
+const PORT = 3031;
 app.listen(PORT, () => {
   console.log(`API Gemini rodando em http://localhost:${PORT}/api/gemini`);
 });
