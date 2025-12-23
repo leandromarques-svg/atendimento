@@ -280,11 +280,11 @@ const App: React.FC = () => {
     setIsGeneratingInsights(true);
 
     try {
-      // Usar a chave de API correta do ambiente
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+      // Usar a chave de API do ambiente
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
       if (!apiKey) {
-        throw new Error('API Key não configurada');
+        throw new Error('API Key não configurada. Verifique se o arquivo .env contém VITE_GEMINI_API_KEY');
       }
 
       const genAI = new GoogleGenAI(apiKey);
