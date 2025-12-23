@@ -4,7 +4,7 @@
  */
 export const parseDurationToSeconds = (durationStr: string): number => {
   if (!durationStr || durationStr === '0s' || durationStr === '0' || durationStr.trim() === '') return 0;
-  
+
   const regex = /(\d+)\s*(w|d|h|m|s|ms)/g;
   let totalSeconds = 0;
   let match;
@@ -30,7 +30,7 @@ export const parseDurationToSeconds = (durationStr: string): number => {
  */
 export const formatSecondsToTime = (seconds: number): string => {
   if (isNaN(seconds) || seconds <= 0) return '00:00:00';
-  
+
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
@@ -49,7 +49,7 @@ export const parseCSVData = (csvText: string) => {
   if (!csvText) return [];
   const lines = csvText.split('\n');
   if (lines.length < 2) return [];
-  
+
   return lines.slice(1)
     .filter(line => line.trim() !== '' && line.includes(';'))
     .map(line => {
@@ -85,7 +85,8 @@ export const parseCSVData = (csvText: string) => {
         frtOriginal: values[7] || '0s',
         ahtSeconds: parseDurationToSeconds(values[6]),
         frtSeconds: parseDurationToSeconds(values[7]),
-        cliente: values[8] || ''
+        cliente: values[8] || '',
+        csat: parseFloat(values[9]) || 0
       };
     })
     .filter(item => item !== null && !isNaN(item.dataObj.getTime()));

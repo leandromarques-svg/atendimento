@@ -183,12 +183,33 @@ const App: React.FC = () => {
     return Array.from(a).sort();
   }, [data]);
 
+  const queuesList = useMemo(() => {
+    const q = new Set<string>();
+    data.forEach(d => d.fila && q.add(d.fila));
+    return Array.from(q).sort();
+  }, [data]);
+
+  const top10Clients = useMemo(() => {
+    const clientCount: Record<string, number> = {};
+    data.forEach(d => {
+      if (d.cliente) {
+        clientCount[d.cliente] = (clientCount[d.cliente] || 0) + 1;
+      }
+    });
+    return Object.entries(clientCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name]) => name);
+  }, [data]);
+
   const filteredData = useMemo(() => {
     return data.filter(d => {
       const matchesSearch = d.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || d.agente.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPlatform = platformFilter === 'ALL' || d.plataforma === platformFilter;
       const matchesCategory = selectedCategory === 'ALL' || d.categoria === selectedCategory;
       const matchesAgent = selectedAgent === 'ALL' || d.agente === selectedAgent;
+      const matchesQueue = selectedQueue === 'ALL' || d.fila === selectedQueue;
+      const matchesClient = selectedClient === 'ALL' || d.cliente === selectedClient;
       const matchesYear = selectedYear === 'ALL' || d.dataObj.getFullYear().toString() === selectedYear;
       const matchesMonth = selectedMonth === 'ALL' || d.dataObj.getMonth().toString() === selectedMonth;
 
@@ -197,9 +218,9 @@ const App: React.FC = () => {
       const end = dateEnd ? new Date(dateEnd + 'T23:59:59') : null;
       const matchesDate = (!start || ticketDate >= start) && (!end || ticketDate <= end);
 
-      return matchesSearch && matchesPlatform && matchesCategory && matchesAgent && matchesDate && matchesYear && matchesMonth;
+      return matchesSearch && matchesPlatform && matchesCategory && matchesAgent && matchesQueue && matchesClient && matchesDate && matchesYear && matchesMonth;
     });
-  }, [data, searchTerm, platformFilter, selectedCategory, selectedAgent, dateStart, dateEnd, selectedYear, selectedMonth]);
+  }, [data, searchTerm, platformFilter, selectedCategory, selectedAgent, selectedQueue, selectedClient, dateStart, dateEnd, selectedYear, selectedMonth]);
 
   const heatmapData = useMemo(() => {
     // 7 days x 24 hours
@@ -229,13 +250,17 @@ const App: React.FC = () => {
 
   const metrics = useMemo(() => {
     if (filteredData.length === 0) return null;
+
+    // Filtrar apenas registros com tempos válidos (não zerados)
+    const validAHT = filteredData.filter(d => d.ahtSeconds > 0);
+    const validFRT = filteredData.filter(d => d.frtSeconds > 0);
+
     let totalAHT = 0;
     let totalFRT = 0;
     const categoriesMap: Record<string, { total: number; FRESH: number; BLIP: number; totalAHT: number }> = {};
     const agents: Record<string, { count: number; FRESH: number; BLIP: number }> = {};
+
     filteredData.forEach(d => {
-      totalAHT += d.ahtSeconds;
-      totalFRT += d.frtSeconds;
       if (!categoriesMap[d.categoria]) categoriesMap[d.categoria] = { total: 0, FRESH: 0, BLIP: 0, totalAHT: 0 };
       categoriesMap[d.categoria].total++;
       categoriesMap[d.categoria].totalAHT += d.ahtSeconds;
@@ -246,10 +271,14 @@ const App: React.FC = () => {
       if (d.plataforma === 'FRESH') agents[d.agente].FRESH++;
       if (d.plataforma === 'BLIP') agents[d.agente].BLIP++;
     });
+
+    validAHT.forEach(d => totalAHT += d.ahtSeconds);
+    validFRT.forEach(d => totalFRT += d.frtSeconds);
+
     return {
       total: filteredData.length,
-      avgAHT: totalAHT / filteredData.length,
-      avgFRT: totalFRT / filteredData.length,
+      avgAHT: validAHT.length > 0 ? totalAHT / validAHT.length : 0,
+      avgFRT: validFRT.length > 0 ? totalFRT / validFRT.length : 0,
       categories: Object.entries(categoriesMap).map(([name, val]) => ({
         name,
         value: val.total,
@@ -275,6 +304,61 @@ const App: React.FC = () => {
       else grouped[monthIdx].BLIP_count++;
     });
     return grouped;
+  }, [filteredData]);
+
+  // Registros incompletos
+  const incompleteRecords = useMemo(() => {
+    return filteredData.filter(d =>
+      !d.fila || !d.categoria || !d.agente || d.ahtSeconds === 0 || d.frtSeconds === 0
+    );
+  }, [filteredData]);
+
+  // Métricas por fila
+  const queueMetrics = useMemo(() => {
+    const queues: Record<string, number> = {};
+    filteredData.forEach(d => {
+      if (d.fila) {
+        queues[d.fila] = (queues[d.fila] || 0) + 1;
+      }
+    });
+    return Object.entries(queues)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredData]);
+
+  // Performance de agentes (para nova aba)
+  const agentPerformance = useMemo(() => {
+    const agentStats: Record<string, {
+      total: number;
+      validAHT: number[];
+      validFRT: number[];
+      csatScores: number[];
+    }> = {};
+
+    filteredData.forEach(d => {
+      if (!agentStats[d.agente]) {
+        agentStats[d.agente] = { total: 0, validAHT: [], validFRT: [], csatScores: [] };
+      }
+      agentStats[d.agente].total++;
+      if (d.ahtSeconds > 0) agentStats[d.agente].validAHT.push(d.ahtSeconds);
+      if (d.frtSeconds > 0) agentStats[d.agente].validFRT.push(d.frtSeconds);
+      if (d.csat > 0) agentStats[d.agente].csatScores.push(d.csat);
+    });
+
+    return Object.entries(agentStats).map(([name, stats]) => ({
+      name,
+      total: stats.total,
+      avgAHT: stats.validAHT.length > 0
+        ? stats.validAHT.reduce((a, b) => a + b, 0) / stats.validAHT.length
+        : 0,
+      avgFRT: stats.validFRT.length > 0
+        ? stats.validFRT.reduce((a, b) => a + b, 0) / stats.validFRT.length
+        : 0,
+      avgCSAT: stats.csatScores.length > 0
+        ? stats.csatScores.reduce((a, b) => a + b, 0) / stats.csatScores.length
+        : 0,
+      csatCount: stats.csatScores.length
+    })).sort((a, b) => a.avgAHT - b.avgAHT); // Mais rápido primeiro
   }, [filteredData]);
 
   const generateAIInsights = async () => {
@@ -381,6 +465,9 @@ const App: React.FC = () => {
             <button onClick={() => setView('table')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'table' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <Database size={14} /> Base Analítica
             </button>
+            <button onClick={() => setView('agents')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'agents' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Users size={14} /> Agentes
+            </button>
             <button onClick={() => setView('insights')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'insights' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <Sparkles size={14} className={view === 'insights' ? 'text-[#3f2666]' : 'text-amber-500'} /> Insights IA
             </button>
@@ -421,6 +508,15 @@ const App: React.FC = () => {
             <option value="ALL">Mês: Todos</option>
             {MONTHS.map((m, i) => <option key={i} value={i.toString()}>{m}</option>)}
           </select>
+          <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedQueue} onChange={(e) => setSelectedQueue(e.target.value)}>
+            <option value="ALL">Filas: Todas</option>
+            {queuesList.map(q => <option key={q} value={q}>{q}</option>)}
+          </select>
+          <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
+            <option value="ALL">Clientes: Todos</option>
+            <option value="ALL" disabled>--- Top 10 ---</option>
+            {top10Clients.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
           <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 ml-auto">
             <Calendar size={12} className="text-slate-400" />
             <input type="date" className="bg-transparent text-[10px] font-bold outline-none" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
@@ -439,11 +535,28 @@ const App: React.FC = () => {
           </div>
         ) : view === 'dashboard' ? (
           <div className="space-y-8 pb-12">
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {incompleteRecords.length > 0 && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-red-800">
+                    ⚠️ {incompleteRecords.length} registro{incompleteRecords.length > 1 ? 's' : ''} incompleto{incompleteRecords.length > 1 ? 's' : ''} encontrado{incompleteRecords.length > 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">Registros com dados faltantes estão destacados em vermelho na Base Analítica</p>
+                </div>
+              </div>
+            )}
+
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <StatCard title="Total Tickets" value={filteredData.length} icon={<Ticket className="text-[#3f2666]" size={18} />} subValue="Volume processado" />
               <StatCard title="TMA Médio" value={metrics ? formatSecondsToTime(metrics.avgAHT) : '00:00:00'} icon={<Clock className="text-emerald-500" size={18} />} subValue="Tempo Atendimento" />
               <StatCard title="TMR Médio" value={metrics ? formatSecondsToTime(metrics.avgFRT) : '00:00:00'} icon={<Activity className="text-blue-500" size={18} />} subValue="Tempo Resposta" />
               <StatCard title="Agentes" value={metrics ? metrics.agents.length : 0} icon={<Users className="text-amber-500" size={18} />} subValue="Ativos no período" />
+              <StatCard title="Filas Ativas" value={queueMetrics.length} icon={<Tag className="text-purple-500" size={18} />} subValue="Total de filas" />
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -575,20 +688,141 @@ const App: React.FC = () => {
                     <tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Canal</th><th className="px-6 py-4">Agente</th><th className="px-6 py-4">Categoria</th><th className="px-6 py-4">TMA</th><th className="px-6 py-4">Cliente</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-[11px]">
-                    {paginatedData.map((ticket, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="px-6 py-3 font-mono font-bold text-indigo-600">{ticket.numeroTicket}</td>
-                        <td className="px-6 py-3"><span className="px-2 py-0.5 rounded text-[8px] font-black bg-slate-100">{ticket.plataforma}</span></td>
-                        <td className="px-6 py-3 text-slate-700 font-bold uppercase">{ticket.agente}</td>
-                        <td className="px-6 py-3 text-slate-400 italic">{ticket.categoria}</td>
-                        <td className="px-6 py-3 font-mono text-slate-500">{ticket.ahtOriginal}</td>
-                        <td className="px-6 py-3 text-slate-400 font-bold truncate max-w-[150px]">{ticket.cliente || '-'}</td>
+                    {paginatedData.map((ticket, i) => {
+                      const isIncomplete = !ticket.fila || !ticket.categoria || !ticket.agente || ticket.ahtSeconds === 0 || ticket.frtSeconds === 0;
+                      return (
+                        <tr key={i} className={`hover:bg-slate-50 ${isIncomplete ? 'bg-red-50 border-l-4 border-l-red-500' : ''}`}>
+                          <td className="px-6 py-3 font-mono font-bold text-indigo-600">{ticket.numeroTicket}</td>
+                          <td className="px-6 py-3"><span className="px-2 py-0.5 rounded text-[8px] font-black bg-slate-100">{ticket.plataforma}</span></td>
+                          <td className={`px-6 py-3 font-bold uppercase ${isIncomplete && !ticket.agente ? 'text-red-600' : 'text-slate-700'}`}>{ticket.agente || '⚠️ FALTANDO'}</td>
+                          <td className={`px-6 py-3 italic ${isIncomplete && !ticket.categoria ? 'text-red-600' : 'text-slate-400'}`}>{ticket.categoria || '⚠️ FALTANDO'}</td>
+                          <td className={`px-6 py-3 font-mono ${isIncomplete && ticket.ahtSeconds === 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>{ticket.ahtOriginal || '⚠️ 0s'}</td>
+                          <td className="px-6 py-3 text-slate-400 font-bold truncate max-w-[150px]">{ticket.cliente || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        ) : view === 'agents' ? (
+          /* AGENTS VIEW */
+          <div className="space-y-8 pb-12">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-2xl border border-purple-200">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white rounded-xl shadow-sm">
+                  <Users className="text-purple-600" size={28} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-800">Análise de Performance por Agente</h2>
+                  <p className="text-slate-600 text-sm font-medium">Velocidade de atendimento e satisfação do cliente (CSAT)</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* TMA por Agente */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={14} /> Tempo Médio de Atendimento (TMA)
+                </h3>
+                <div style={{ height: Math.max(400, agentPerformance.length * 40) + 'px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart layout="vertical" data={agentPerformance} margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" hide />
+                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        cursor={{ fill: '#f8fafc' }}
+                        formatter={(value: any) => formatSecondsToTime(value)}
+                      />
+                      <Bar dataKey="avgAHT" name="TMA Médio" radius={[0, 4, 4, 0]} barSize={20}>
+                        {agentPerformance.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* TMR por Agente */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
+                  <Activity size={14} /> Tempo Médio de 1ª Resposta (TMR)
+                </h3>
+                <div style={{ height: Math.max(400, agentPerformance.length * 40) + 'px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart layout="vertical" data={agentPerformance} margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" hide />
+                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        cursor={{ fill: '#f8fafc' }}
+                        formatter={(value: any) => formatSecondsToTime(value)}
+                      />
+                      <Bar dataKey="avgFRT" name="TMR Médio" radius={[0, 4, 4, 0]} barSize={20} fill="#10b981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela de Performance com CSAT */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Target size={14} /> Ranking de Performance e Satisfação
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4 text-left">Posição</th>
+                      <th className="px-6 py-4 text-left">Agente</th>
+                      <th className="px-6 py-4 text-center">Total Tickets</th>
+                      <th className="px-6 py-4 text-center">TMA Médio</th>
+                      <th className="px-6 py-4 text-center">TMR Médio</th>
+                      <th className="px-6 py-4 text-center">CSAT Médio</th>
+                      <th className="px-6 py-4 text-center">Avaliações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-[11px]">
+                    {agentPerformance.map((agent, index) => (
+                      <tr key={index} className="hover:bg-slate-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {index === 0 && <span className="text-xl">🥇</span>}
+                            {index === 1 && <span className="text-xl">🥈</span>}
+                            {index === 2 && <span className="text-xl">🥉</span>}
+                            <span className="font-bold text-slate-600">#{index + 1}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-slate-800 uppercase">{agent.name}</td>
+                        <td className="px-6 py-4 text-center text-slate-600 font-mono">{agent.total}</td>
+                        <td className="px-6 py-4 text-center font-mono text-emerald-600 font-bold">{formatSecondsToTime(agent.avgAHT)}</td>
+                        <td className="px-6 py-4 text-center font-mono text-blue-600">{formatSecondsToTime(agent.avgFRT)}</td>
+                        <td className="px-6 py-4 text-center">
+                          {agent.avgCSAT > 0 ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="font-bold text-amber-600">{agent.avgCSAT.toFixed(1)}</span>
+                              <span className="text-amber-400">⭐</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 text-xs">Sem avaliações</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center text-slate-500 text-xs">{agent.csatCount} avaliações</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </section>
+            </div>
           </div>
         ) : (
           /* INSIGHTS VIEW */

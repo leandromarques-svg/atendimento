@@ -1,0 +1,77 @@
+// NOVOS useMemo para adicionar após linha 184 (após agentsList)
+
+  // Lista de filas
+  const queuesList = useMemo(() => {
+    const q = new Set<string>();
+    data.forEach(d => d.fila && q.add(d.fila));
+    return Array.from(q).sort();
+  }, [data]);
+
+  // Top 10 clientes que mais demandam
+  const top10Clients = useMemo(() => {
+    const clientCount: Record<string, number> = {};
+    filteredData.forEach(d => {
+      if (d.cliente) {
+        clientCount[d.cliente] = (clientCount[d.cliente] || 0) + 1;
+      }
+    });
+    return Object.entries(clientCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name]) => name);
+  }, [filteredData]);
+
+  // Registros incompletos
+  const incompleteRecords = useMemo(() => {
+    return filteredData.filter(d => 
+      !d.fila || !d.categoria || !d.agente || d.ahtSeconds === 0 || d.frtSeconds === 0
+    );
+  }, [filteredData]);
+
+  // Métricas por fila
+  const queueMetrics = useMemo(() => {
+    const queues: Record<string, number> = {};
+    filteredData.forEach(d => {
+      if (d.fila) {
+        queues[d.fila] = (queues[d.fila] || 0) + 1;
+      }
+    });
+    return Object.entries(queues)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredData]);
+
+  // Performance de agentes (para nova aba)
+  const agentPerformance = useMemo(() => {
+    const agentStats: Record<string, {
+      total: number;
+      validAHT: number[];
+      validFRT: number[];
+      csatScores: number[];
+    }> = {};
+    
+    filteredData.forEach(d => {
+      if (!agentStats[d.agente]) {
+        agentStats[d.agente] = { total: 0, validAHT: [], validFRT: [], csatScores: [] };
+      }
+      agentStats[d.agente].total++;
+      if (d.ahtSeconds > 0) agentStats[d.agente].validAHT.push(d.ahtSeconds);
+      if (d.frtSeconds > 0) agentStats[d.agente].validFRT.push(d.frtSeconds);
+      if (d.csat > 0) agentStats[d.agente].csatScores.push(d.csat);
+    });
+    
+    return Object.entries(agentStats).map(([name, stats]) => ({
+      name,
+      total: stats.total,
+      avgAHT: stats.validAHT.length > 0 
+        ? stats.validAHT.reduce((a, b) => a + b, 0) / stats.validAHT.length 
+        : 0,
+      avgFRT: stats.validFRT.length > 0
+        ? stats.validFRT.reduce((a, b) => a + b, 0) / stats.validFRT.length
+        : 0,
+      avgCSAT: stats.csatScores.length > 0
+        ? stats.csatScores.reduce((a, b) => a + b, 0) / stats.csatScores.length
+        : 0,
+      csatCount: stats.csatScores.length
+    })).sort((a, b) => a.avgAHT - b.avgAHT); // Mais rápido primeiro
+  }, [filteredData]);

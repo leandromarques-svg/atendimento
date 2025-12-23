@@ -12,6 +12,7 @@ export interface TicketData {
   ahtSeconds: number;
   frtSeconds: number;
   cliente: string;
+  csat: number; // Nota de satisfação (0-5)
 }
 
 export interface PlatformMetrics {
