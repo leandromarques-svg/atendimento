@@ -59,6 +59,7 @@ const App: React.FC = () => {
   const [dateEnd, setDateEnd] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
+  const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -315,15 +316,18 @@ const App: React.FC = () => {
 
   // Métricas por fila
   const queueMetrics = useMemo(() => {
-    const queues: Record<string, number> = {};
+    const queues: Record<string, { total: number; FRESH: number; BLIP: number }> = {};
     filteredData.forEach(d => {
       if (d.fila) {
-        queues[d.fila] = (queues[d.fila] || 0) + 1;
+        if (!queues[d.fila]) queues[d.fila] = { total: 0, FRESH: 0, BLIP: 0 };
+        queues[d.fila].total++;
+        if (d.plataforma === 'FRESH') queues[d.fila].FRESH++;
+        if (d.plataforma === 'BLIP') queues[d.fila].BLIP++;
       }
     });
     return Object.entries(queues)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+      .map(([name, val]) => ({ name, total: val.total, FRESH: val.FRESH, BLIP: val.BLIP }))
+      .sort((a, b) => b.total - a.total);
   }, [filteredData]);
 
   // Performance de agentes (para nova aba)
@@ -444,8 +448,13 @@ const App: React.FC = () => {
     }
   };
 
-  const paginatedData = filteredData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  // Aplicar filtro de incompletos se ativado
+  const displayData = showOnlyIncomplete
+    ? filteredData.filter(d => !d.fila || !d.categoria || !d.agente || d.ahtSeconds === 0 || d.frtSeconds === 0)
+    : filteredData;
+
+  const paginatedData = displayData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(displayData.length / ITEMS_PER_PAGE);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
@@ -462,11 +471,11 @@ const App: React.FC = () => {
             <button onClick={() => setView('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'dashboard' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <LayoutDashboard size={14} /> Dashboard
             </button>
-            <button onClick={() => setView('table')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'table' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              <Database size={14} /> Base Analítica
-            </button>
             <button onClick={() => setView('agents')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'agents' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <Users size={14} /> Agentes
+            </button>
+            <button onClick={() => setView('table')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'table' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Database size={14} /> Base Analítica
             </button>
             <button onClick={() => setView('insights')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'insights' ? 'bg-white text-[#3f2666] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <Sparkles size={14} className={view === 'insights' ? 'text-[#3f2666]' : 'text-amber-500'} /> Insights IA
@@ -492,6 +501,10 @@ const App: React.FC = () => {
             <option value="BLIP">Blip</option>
             <option value="FRESH">Freshdesk</option>
           </select>
+          <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedQueue} onChange={(e) => setSelectedQueue(e.target.value)}>
+            <option value="ALL">Filas: Todas</option>
+            {queuesList.map(q => <option key={q} value={q}>{q}</option>)}
+          </select>
           <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)}>
             <option value="ALL">Agentes: Todos</option>
             {agentsList.map(a => <option key={a} value={a}>{a}</option>)}
@@ -507,10 +520,6 @@ const App: React.FC = () => {
           <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
             <option value="ALL">Mês: Todos</option>
             {MONTHS.map((m, i) => <option key={i} value={i.toString()}>{m}</option>)}
-          </select>
-          <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedQueue} onChange={(e) => setSelectedQueue(e.target.value)}>
-            <option value="ALL">Filas: Todas</option>
-            {queuesList.map(q => <option key={q} value={q}>{q}</option>)}
           </select>
           <select className="text-[11px] font-bold border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-slate-600" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
             <option value="ALL">Clientes: Todos</option>
@@ -535,28 +544,12 @@ const App: React.FC = () => {
           </div>
         ) : view === 'dashboard' ? (
           <div className="space-y-8 pb-12">
-            {incompleteRecords.length > 0 && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-red-800">
-                    ⚠️ {incompleteRecords.length} registro{incompleteRecords.length > 1 ? 's' : ''} incompleto{incompleteRecords.length > 1 ? 's' : ''} encontrado{incompleteRecords.length > 1 ? 's' : ''}
-                  </p>
-                  <p className="text-xs text-red-600 mt-1">Registros com dados faltantes estão destacados em vermelho na Base Analítica</p>
-                </div>
-              </div>
-            )}
-
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <StatCard title="Total Tickets" value={filteredData.length} icon={<Ticket className="text-[#3f2666]" size={18} />} subValue="Volume processado" />
+              <StatCard title="Filas Ativas" value={queueMetrics.length} icon={<Tag className="text-purple-500" size={18} />} subValue="Total de filas" />
               <StatCard title="TMA Médio" value={metrics ? formatSecondsToTime(metrics.avgAHT) : '00:00:00'} icon={<Clock className="text-emerald-500" size={18} />} subValue="Tempo Atendimento" />
               <StatCard title="TMR Médio" value={metrics ? formatSecondsToTime(metrics.avgFRT) : '00:00:00'} icon={<Activity className="text-blue-500" size={18} />} subValue="Tempo Resposta" />
               <StatCard title="Agentes" value={metrics ? metrics.agents.length : 0} icon={<Users className="text-amber-500" size={18} />} subValue="Ativos no período" />
-              <StatCard title="Filas Ativas" value={queueMetrics.length} icon={<Tag className="text-purple-500" size={18} />} subValue="Total de filas" />
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -669,7 +662,31 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : view === 'table' ? (
-          <div className="pb-12 animate-in">
+          <div className="pb-12 animate-in space-y-6">
+            {incompleteRecords.length > 0 && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-red-800">
+                      ⚠️ {incompleteRecords.length} registro{incompleteRecords.length > 1 ? 's' : ''} incompleto{incompleteRecords.length > 1 ? 's' : ''} encontrado{incompleteRecords.length > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-red-600 mt-1">Registros com dados faltantes estão destacados em vermelho abaixo</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowOnlyIncomplete(!showOnlyIncomplete)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${showOnlyIncomplete ? 'bg-red-600 text-white shadow-md' : 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'}`}
+                >
+                  {showOnlyIncomplete ? '✓ Mostrando Incompletos' : 'Filtrar Incompletos'}
+                </button>
+              </div>
+            )}
+
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <h3 className="font-black text-slate-800 text-sm uppercase">Lista Detalhada</h3>
