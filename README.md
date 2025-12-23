@@ -1,3 +1,17 @@
+# Como rodar frontend e backend juntos
+
+1. Instale as dependências do projeto e do backend:
+   ```
+   npm install
+   cd api && npm install && cd ..
+   ```
+
+2. Para rodar frontend e backend juntos:
+   ```
+   npm run start:all
+   ```
+
+Se for a primeira vez, o comando acima instalará o pacote npm-run-all automaticamente.
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
