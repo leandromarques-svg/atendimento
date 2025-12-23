@@ -280,7 +280,14 @@ const App: React.FC = () => {
     setIsGeneratingInsights(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      // Usar a chave de API correta do ambiente
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+
+      if (!apiKey) {
+        throw new Error('API Key não configurada');
+      }
+
+      const genAI = new GoogleGenAI(apiKey);
 
       // Encontrar categoria que consome mais tempo médio
       const catTimeSorted = [...(metrics?.categories || [])].sort((a, b) => (b.totalAHT / b.value) - (a.totalAHT / a.value));
@@ -320,12 +327,11 @@ const App: React.FC = () => {
 
       Dados para análise: ${summary}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: prompt,
-      });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
 
-      const text = response.text || '{}';
       // Remover code blocks se a IA colocá-los
       const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
@@ -334,6 +340,7 @@ const App: React.FC = () => {
         setAiAnalysis(json);
       } catch (e) {
         console.error("JSON Parse Error", e);
+        console.log("Resposta recebida:", text);
         setAiAnalysis({
           period_analysis: "Não foi possível estruturar a análise. Tente novamente.",
           team_performance: "-",
@@ -342,9 +349,10 @@ const App: React.FC = () => {
           action_plan: ["Erro na geração. Verifique os dados."]
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gemini API Error:', err);
-      alert('Erro ao conectar com a IA. Verifique sua chave de API.');
+      const errorMsg = err?.message || 'Erro desconhecido';
+      alert(`Erro ao conectar com a IA: ${errorMsg}\n\nVerifique:\n1. Se a chave de API está correta\n2. Se você reiniciou o servidor após alterar o .env\n3. Se a chave tem permissões para usar a API Gemini`);
     } finally {
       setIsGeneratingInsights(false);
     }
