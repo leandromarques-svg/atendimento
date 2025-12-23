@@ -1,0 +1,5 @@
+{
+  "name": "Análise de Indicadores de Atendimento",
+  "description": "Dashboard analítico comparativo para tickets de suporte das plataformas Blip e Freshdesk, apresentando KPIs, gráficos de performance e métricas de eficiência por agente.",
+  "requestFramePermissions": []
+}
