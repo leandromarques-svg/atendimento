@@ -321,7 +321,7 @@ const App: React.FC = () => {
       Dados para análise: ${summary}`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-1.5-flash',
         contents: prompt,
       });
 
@@ -515,20 +515,20 @@ const App: React.FC = () => {
                 </div>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Participação por Categoria (Top 5)</h3>
+                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Participação por Categoria</h3>
                 <div className="flex-1 min-h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={(metrics?.categories || []).slice(0, 5)}
+                        data={metrics?.categories || []}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
                         outerRadius={80}
-                        paddingAngle={5}
+                        paddingAngle={2}
                         dataKey="value"
                       >
-                        {(metrics?.categories || []).slice(0, 5).map((entry, index) => (
+                        {(metrics?.categories || []).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
