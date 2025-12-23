@@ -134,23 +134,63 @@ const App: React.FC = () => {
   const exportToPDF = async () => {
     if (!dashboardRef.current || data.length === 0) return;
     setIsExporting(true);
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const canvas = await html2canvas(dashboardRef.current, { scale: 2 });
+      // Small delay to ensure render stability
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const element = dashboardRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2, // Retain high quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#f8fafc' // Match app background
+      });
+
       const imgData = canvas.toDataURL('image/png');
+
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+
       const margin = 10;
-      const contentWidth = pdfWidth - (margin * 2);
-      pdf.setFillColor(63, 38, 102);
-      pdf.rect(0, 0, pdfWidth, 40, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(14);
-      pdf.text('Análise de Indicadores de Atendimento', margin, 20);
-      const imgProps = pdf.getImageProperties(imgData);
-      const ratio = contentWidth / imgProps.width;
-      pdf.addImage(imgData, 'PNG', margin, 45, contentWidth, imgProps.height * ratio);
-      pdf.save('relatorio-analytics.pdf');
+      const imgWidth = pdfWidth - (margin * 2);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+      const headerHeight = 35; // Header space for first page
+
+      // Draw Header Function
+      const drawHeader = (doc: any) => {
+        doc.setFillColor(63, 38, 102);
+        doc.rect(0, 0, pdfWidth, headerHeight, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Análise de Indicadores de Atendimento', margin, 18);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 26);
+      };
+
+      // Page 1
+      drawHeader(pdf);
+      position = headerHeight + 5; // Start below header
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - position - margin); // Decrement used height
+
+      // Subsequent Pages
+      while (heightLeft > 0) {
+        position -= (pdfHeight - margin); // Shift up
+        pdf.addPage();
+        // We shift the image up so the next chunk is visible
+        // We add a top margin on new pages as well
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - (margin * 2));
+      }
+
+      pdf.save(`relatorio-atendimento-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (e) {
       console.error(e);
       alert("Erro ao exportar PDF.");
