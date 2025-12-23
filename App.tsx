@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area
 } from 'recharts';
-import { 
-  Users, Ticket, Clock, Activity, TrendingUp, Filter, 
+import {
+  Users, Ticket, Clock, Activity, TrendingUp, Filter,
   Upload, ChevronLeft, ChevronRight, Calendar,
   LayoutDashboard, Database, Download, Tag, User, Sparkles, Brain, Lightbulb, Target
 } from 'lucide-react';
@@ -14,6 +14,7 @@ import html2canvas from 'html2canvas';
 import { GoogleGenAI } from "@google/genai";
 import { parseCSVData, formatSecondsToTime } from './utils';
 import { TicketData } from './types';
+import ReactMarkdown from 'react-markdown';
 
 const BRAND_COLOR = '#3f2666';
 const FRESH_COLOR = '#10b981';
@@ -30,8 +31,8 @@ const LOGO_DATA_URI = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://ww
 
 const LogoHeader = () => (
   <svg width="32" height="32" viewBox="0 0 237.39 237.4">
-    <path fill={BRAND_COLOR} d="M34.39,170.39c3.89,1.38,5.5,1.9,7.75.51,1.18-.78,2.54-2.08,4.57-4.09,4.31-4.25,5.23-5.53,4.39-8.77-1.01-2.19-1.76-4.47-2.2-6.81-.03-.15-.05-.29-.08-.44-.12-.69-.21-1.39-.28-2.09-.02-.2-.04-.39-.06-.58-.06-.81-.1-1.62-.09-2.43,0-.22.02-.44.03-.67.02-.58.05-1.16.1-1.73.03-.35.07-.71.11-1.06.06-.44.13-.88.2-1.31.28-1.64.71-3.25,1.27-4.84.02-.07.04-.14.07-.2h0c1.43-3.92,3.69-7.6,6.86-10.73.06-.06.12-.11.18-.17,0,0,0,0,0,0,.01-.01.02-.02.04-.03.4-.39.81-.76,1.22-1.12.36-.32.73-.62,1.11-.92,0,0,.02-.01.02-.02,3.71-2.93,8-4.83,12.47-5.67.15-.03.29-.05.44-.08.69-.12,1.39-.21,2.09-.28.2-.02.39-.04.58-.06.52-.04,1.05-.05,1.58-.06.14,0,.27-.02.41-.02.06,0,.12,0,.17,0,.09,0,.18-.01.27-.01.03,0,.07,0,.1,0,.03,0,.06,0,.09,0,.78,0,1.56.04,2.34.11.34.03.68.08,1.02.12.41.05.82.11,1.22.18.49.08.97.17,1.46.28.12.03.23.06.34.08,5.08,1.18,9.89,3.71,13.79,7.66.26.26.49.54.74.81.26.28.51.55.76.84.1.12.2.24.3.36,2.39,2.86,4.14,6.08,5.27,9.46h0s.02.08.03.12c.17.52.34,1.05.48,1.58.12.43.22.87.32,1.3.08.36.17.72.23,1.08.13.72.23,1.45.31,2.18.03.24.04.47.06.71.05.64.08,1.28.09,1.93,0,.21.01.42.01.64,0,.78-.04,1.56-.11,2.34-.03.34-.08.68-.12,1.02-.05.41-.11.82-.18,1.22-.08.49-.17.97-.28,1.46-.03.12-.06.23-.08.34-.48,2.06-1.19,4.06-2.11,5.99-.44,1.76-.37,2.98.55,4.46.78,1.18,2.08,2.54,4.09,4.57,4.88,4.95,5.84,5.43,10.38,3.91,2.26-.9,4.6-1.5,6.96-1.8.22-.03.44-.05.66-.07.6-.06,1.21-.12,1.81-.15.72-.03,1.44-.04,2.16-.02.14,0,.28.01.42.02,3.47.15,6.91.92,10.16,2.3,2.52.82,3.94.95,5.76-.17,1.18-.78,2.54-2.08,4.57-4.09,5.36-5.29,5.48,5.97,3.49-11.58-.95-2.68-1.48-5.47-1.6-8.28-.02-.16-.05-.32-.07-.48-.03-.25-.05-.51-.07-.76-.06-.69-.09-1.38-.1-2.08,0-.23-.01-.45-.01-.68,0-.84.04-1.68.12-2.51.03-.37.09-.73.13-1.1.05-.44.11-.87.19-1.31.09-.52.18-1.05.3-1.57.03-.12.06-.25.09-.37,1.25-5.46,3.94-10.63,8.15-14.83,2.49-2.48,5.29-4.42,8.27-5.88,7.47-3.73,16.03-4.2,23.75-1.41,4.14,1.49,5.86,2.05,8.25.56,1.25-.83,2.71-2.24,4.87-4.39,5.71-5.69,5.83-6.41,3.71-12.45-3.88-11.03-1.32-23.79,7.46-32.54,1.49-1.48,3.1-2.76,4.8-3.87C203.05,25.45,164.54.5,120.02,0,54.47-.72.74,51.83,0,117.38c-.22,19.47,4.27,37.89,12.39,54.19,6.94-3.33,14.84-3.75,21.99-1.18Z"/>
-    <path fill={BRAND_COLOR} d="M229.78,117.57c-4.14-1.49-5.86-2.05-8.25-.56-1.25.83-2.71,2.24-4.87,4.39-5.71,5.69-5.83,6.41-3.71,12.45,3.88,11.03,1.32,23.79-7.46,32.54-4.46,4.45-10.01,7.23-15.82,8.33-.16.03-.31.05-.47.08-.74.13-1.48.23-2.22.3-.21.02-.41.05-.62.06-.34.03-.69.02-1.03.04-4.26.47-8.59,0-12.68-1.46-3.89-1.38-5.5-1.9-7.75-.51-1.18.78-2.54,2.08-4.57,4.09-4.66,4.6-5.36,5.71-4.16,9.61.82,1.93,1.42,3.93,1.81,5.97.03.15.05.29.08.44.12.69.21,1.39.28,2.09.02.2.04.39.06.59.02.22.01.44.03.66.01.2.01.39.02.59.01.39.05.78.05,1.17,0,.1,0,.2-.01.3-.07,7.41-2.98,14.8-8.67,20.42-4.19,4.14-9.4,6.73-14.86,7.75-.15.03-.29.05-.44.08-.69.12-1.39.21-2.09.28-.2.02-.39.04-.59.06-.81.06-1.62.1-2.43.09-.06,0-.12,0-.18,0-.05,0-.11,0-.16,0-.78,0-1.56-.04-2.34-.11-.34-.03-.68-.08-1.02-.12-.41-.05-.81-.11-1.22-.17-.49-.08-.97-.17-1.46-.28-.12-.03-.23-.06-.34-.08-5.08-1.18-9.89-3.71-13.79-7.66-2.31-2.34-4.12-4.97-5.47-7.77-1.54-3.12-2.45-6.44-2.8-9.81,0-.05-.02-.09-.02-.14,0-.08-.01-.15-.02-.23-.05-.59-.09-1.18-.1-1.78,0-.21-.03-.42-.03-.64,0-.21-.01-.42-.01-.63,0-.19.02-.37.03-.56,0-.09,0-.19.01-.28.02-.5.03-1,.07-1.5.03-.34.08-.68.12-1.02.05-.41.11-.81.17-1.22.08-.49.17-.97.28-1.46.03-.12.06-.23.08-.34.41-1.76.99-3.49,1.73-5.17.68-2.24.73-3.58-.32-5.28-.78-1.18-2.08-2.54-4.09-4.57-4.65-4.71-5.73-5.37-9.73-4.12-3.3,1.39-6.78,2.14-10.28,2.24-.64.03-1.27.03-1.91.02-.06,0-.13,0-.19,0-3.73-.12-7.44-.96-10.91-2.51-2.15-.64-3.47-.66-5.13.37-1.18.78-2.54,2.08-4.57,4.09-5.36,5.29-5.48,5.97-3.49,11.58,3.08,8.68,1.8,18.51-3.66,26.26,19.29,14.13,43.01,22.59,68.75,22.87,65.55.73,119.28-51.82,120.01-117.37,0-.27,0-.54,0-.8-2.58-.23-5.14-.75-7.61-1.64Z"/>
+    <path fill={BRAND_COLOR} d="M34.39,170.39c3.89,1.38,5.5,1.9,7.75.51,1.18-.78,2.54-2.08,4.57-4.09,4.31-4.25,5.23-5.53,4.39-8.77-1.01-2.19-1.76-4.47-2.2-6.81-.03-.15-.05-.29-.08-.44-.12-.69-.21-1.39-.28-2.09-.02-.2-.04-.39-.06-.58-.06-.81-.1-1.62-.09-2.43,0-.22.02-.44.03-.67.02-.58.05-1.16.1-1.73.03-.35.07-.71.11-1.06.06-.44.13-.88.2-1.31.28-1.64.71-3.25,1.27-4.84.02-.07.04-.14.07-.2h0c1.43-3.92,3.69-7.6,6.86-10.73.06-.06.12-.11.18-.17,0,0,0,0,0,0,.01-.01.02-.02.04-.03.4-.39.81-.76,1.22-1.12.36-.32.73-.62,1.11-.92,0,0,.02-.01.02-.02,3.71-2.93,8-4.83,12.47-5.67.15-.03.29-.05.44-.08.69-.12,1.39-.21,2.09-.28.2-.02.39-.04.58-.06.52-.04,1.05-.05,1.58-.06.14,0,.27-.02.41-.02.06,0,.12,0,.17,0,.09,0,.18-.01.27-.01.03,0,.07,0,.1,0,.03,0,.06,0,.09,0,.78,0,1.56.04,2.34.11.34.03.68.08,1.02.12.41.05.82.11,1.22.18.49.08.97.17,1.46.28.12.03.23.06.34.08,5.08,1.18,9.89,3.71,13.79,7.66.26.26.49.54.74.81.26.28.51.55.76.84.1.12.2.24.3.36,2.39,2.86,4.14,6.08,5.27,9.46h0s.02.08.03.12c.17.52.34,1.05.48,1.58.12.43.22.87.32,1.3.08.36.17.72.23,1.08.13.72.23,1.45.31,2.18.03.24.04.47.06.71.05.64.08,1.28.09,1.93,0,.21.01.42.01.64,0,.78-.04,1.56-.11,2.34-.03.34-.08.68-.12,1.02-.05.41-.11.82-.18,1.22-.08.49-.17.97-.28,1.46-.03.12-.06.23-.08.34-.48,2.06-1.19,4.06-2.11,5.99-.44,1.76-.37,2.98.55,4.46.78,1.18,2.08,2.54,4.09,4.57,4.88,4.95,5.84,5.43,10.38,3.91,2.26-.9,4.6-1.5,6.96-1.8.22-.03.44-.05.66-.07.6-.06,1.21-.12,1.81-.15.72-.03,1.44-.04,2.16-.02.14,0,.28.01.42.02,3.47.15,6.91.92,10.16,2.3,2.52.82,3.94.95,5.76-.17,1.18-.78,2.54-2.08,4.57-4.09,5.36-5.29,5.48,5.97,3.49-11.58-.95-2.68-1.48-5.47-1.6-8.28-.02-.16-.05-.32-.07-.48-.03-.25-.05-.51-.07-.76-.06-.69-.09-1.38-.1-2.08,0-.23-.01-.45-.01-.68,0-.84.04-1.68.12-2.51.03-.37.09-.73.13-1.1.05-.44.11-.87.19-1.31.09-.52.18-1.05.3-1.57.03-.12.06-.25.09-.37,1.25-5.46,3.94-10.63,8.15-14.83,2.49-2.48,5.29-4.42,8.27-5.88,7.47-3.73,16.03-4.2,23.75-1.41,4.14,1.49,5.86,2.05,8.25.56,1.25-.83,2.71-2.24,4.87-4.39,5.71-5.69,5.83-6.41,3.71-12.45-3.88-11.03-1.32-23.79,7.46-32.54,1.49-1.48,3.1-2.76,4.8-3.87C203.05,25.45,164.54.5,120.02,0,54.47-.72.74,51.83,0,117.38c-.22,19.47,4.27,37.89,12.39,54.19,6.94-3.33,14.84-3.75,21.99-1.18Z" />
+    <path fill={BRAND_COLOR} d="M229.78,117.57c-4.14-1.49-5.86-2.05-8.25-.56-1.25.83-2.71,2.24-4.87,4.39-5.71,5.69-5.83,6.41-3.71,12.45,3.88,11.03,1.32,23.79-7.46,32.54-4.46,4.45-10.01,7.23-15.82,8.33-.16.03-.31.05-.47.08-.74.13-1.48.23-2.22.3-.21.02-.41.05-.62.06-.34.03-.69.02-1.03.04-4.26.47-8.59,0-12.68-1.46-3.89-1.38-5.5-1.9-7.75-.51-1.18.78-2.54,2.08-4.57,4.09-4.66,4.6-5.36,5.71-4.16,9.61.82,1.93,1.42,3.93,1.81,5.97.03.15.05.29.08.44.12.69.21,1.39.28,2.09.02.2.04.39.06.59.02.22.01.44.03.66.01.2.01.39.02.59.01.39.05.78.05,1.17,0,.1,0,.2-.01.3-.07,7.41-2.98,14.8-8.67,20.42-4.19,4.14-9.4,6.73-14.86,7.75-.15.03-.29.05-.44.08-.69.12-1.39.21-2.09.28-.2.02-.39.04-.59.06-.81.06-1.62.1-2.43.09-.06,0-.12,0-.18,0-.05,0-.11,0-.16,0-.78,0-1.56-.04-2.34-.11-.34-.03-.68-.08-1.02-.12-.41-.05-.81-.11-1.22-.17-.49-.08-.97-.17-1.46-.28-.12-.03-.23-.06-.34-.08-5.08-1.18-9.89-3.71-13.79-7.66-2.31-2.34-4.12-4.97-5.47-7.77-1.54-3.12-2.45-6.44-2.8-9.81,0-.05-.02-.09-.02-.14,0-.08-.01-.15-.02-.23-.05-.59-.09-1.18-.1-1.78,0-.21-.03-.42-.03-.64,0-.21-.01-.42-.01-.63,0-.19.02-.37.03-.56,0-.09,0-.19.01-.28.02-.5.03-1,.07-1.5.03-.34.08-.68.12-1.02.05-.41.11-.81.17-1.22.08-.49.17-.97.28-1.46.03-.12.06-.23.08-.34.41-1.76.99-3.49,1.73-5.17.68-2.24.73-3.58-.32-5.28-.78-1.18-2.08-2.54-4.09-4.57-4.65-4.71-5.73-5.37-9.73-4.12-3.3,1.39-6.78,2.14-10.28,2.24-.64.03-1.27.03-1.91.02-.06,0-.13,0-.19,0-3.73-.12-7.44-.96-10.91-2.51-2.15-.64-3.47-.66-5.13.37-1.18.78-2.54,2.08-4.57,4.09-5.36,5.29-5.48,5.97-3.49,11.58,3.08,8.68,1.8,18.51-3.66,26.26,19.29,14.13,43.01,22.59,68.75,22.87,65.55.73,119.28-51.82,120.01-117.37,0-.27,0-.54,0-.8-2.58-.23-5.14-.75-7.61-1.64Z" />
   </svg>
 );
 
@@ -55,7 +56,7 @@ const App: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
-  
+
   // IA State
   const [insights, setInsights] = useState<string>('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
@@ -74,7 +75,7 @@ const App: React.FC = () => {
           if (parsed && parsed.length > 0) {
             setData(parsed);
             setCurrentPage(1);
-            setInsights(''); 
+            setInsights('');
           } else {
             alert("Nenhum registro válido encontrado no CSV.");
           }
@@ -90,14 +91,14 @@ const App: React.FC = () => {
   const generateAIInsights = async () => {
     if (filteredData.length === 0) return;
     setIsGeneratingInsights(true);
-    
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      
+
       // Encontrar categoria que consome mais tempo médio
-      const catTimeSorted = [...(metrics?.categories || [])].sort((a,b) => (b.totalAHT / b.value) - (a.totalAHT / a.value));
+      const catTimeSorted = [...(metrics?.categories || [])].sort((a, b) => (b.totalAHT / b.value) - (a.totalAHT / a.value));
       const topTimeCat = catTimeSorted[0];
-      
+
       const summary = `
         Contexto: Comparativo Freshdesk vs Blip
         Total Tickets Filtrados: ${filteredData.length}
@@ -141,7 +142,7 @@ const App: React.FC = () => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const margin = 10;
       const contentWidth = pdfWidth - (margin * 2);
-      pdf.setFillColor(63, 38, 102); 
+      pdf.setFillColor(63, 38, 102);
       pdf.rect(0, 0, pdfWidth, 40, 'F');
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(14);
@@ -214,19 +215,19 @@ const App: React.FC = () => {
       total: filteredData.length,
       avgAHT: totalAHT / filteredData.length,
       avgFRT: totalFRT / filteredData.length,
-      categories: Object.entries(categoriesMap).map(([name, val]) => ({ 
-        name, 
+      categories: Object.entries(categoriesMap).map(([name, val]) => ({
+        name,
         value: val.total,
         FRESH: val.FRESH,
         BLIP: val.BLIP,
         totalAHT: val.totalAHT
-      })).sort((a,b) => b.value - a.value),
-      agents: Object.entries(agents).map(([name, val]) => ({ 
-        name, 
-        Freshdesk: val.FRESH, 
-        Blip: val.BLIP, 
-        total: val.count 
-      })).sort((a,b) => b.total - a.total)
+      })).sort((a, b) => b.value - a.value),
+      agents: Object.entries(agents).map(([name, val]) => ({
+        name,
+        Freshdesk: val.FRESH,
+        Blip: val.BLIP,
+        total: val.count
+      })).sort((a, b) => b.total - a.total)
     };
   }, [filteredData]);
 
@@ -267,10 +268,10 @@ const App: React.FC = () => {
             </button>
           </nav>
           <div className="flex items-center gap-3">
-             <button disabled={isExporting || data.length === 0} onClick={exportToPDF} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-black hover:bg-slate-50 disabled:opacity-50">
+            <button disabled={isExporting || data.length === 0} onClick={exportToPDF} className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-black hover:bg-slate-50 disabled:opacity-50">
               {isExporting ? <div className="loader"></div> : <Download size={14} />} Exportar PDF
             </button>
-             <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-[#3f2666] text-white rounded-lg text-xs font-black hover:opacity-90 shadow-sm">
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-[#3f2666] text-white rounded-lg text-xs font-black hover:opacity-90 shadow-sm">
               <Upload size={14} /> Importar CSV
             </button>
             <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
@@ -323,21 +324,21 @@ const App: React.FC = () => {
               <StatCard title="Agentes" value={metrics ? metrics.agents.length : 0} icon={<Users className="text-amber-500" size={18} />} subValue="Ativos no período" />
             </section>
             <section className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
-                 <TrendingUp size={16} /> Evolução Mensal de Volume
-               </h3>
-               <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyEvolutionData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="FRESH_count" name="Freshdesk" stroke={FRESH_COLOR} fill={FRESH_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'BLIP'} />
-                      <Area type="monotone" dataKey="BLIP_count" name="Blip" stroke={BLIP_COLOR} fill={BLIP_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'FRESH'} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-               </div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
+                <TrendingUp size={16} /> Evolução Mensal de Volume
+              </h3>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyEvolutionData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="FRESH_count" name="Freshdesk" stroke={FRESH_COLOR} fill={FRESH_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'BLIP'} />
+                    <Area type="monotone" dataKey="BLIP_count" name="Blip" stroke={BLIP_COLOR} fill={BLIP_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'FRESH'} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </section>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -346,7 +347,7 @@ const App: React.FC = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={metrics?.agents || []} layout="vertical">
                       <XAxis type="number" hide />
-                      <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={120} tick={{fontSize: 10, fill: '#64748b'}} />
+                      <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 10, fill: '#64748b' }} />
                       <Tooltip />
                       <Bar name="Freshdesk" dataKey="Freshdesk" stackId="a" fill={FRESH_COLOR} barSize={14} hide={platformFilter === 'BLIP'} />
                       <Bar name="Blip" dataKey="Blip" stackId="a" fill={BLIP_COLOR} barSize={14} hide={platformFilter === 'FRESH'} />
@@ -357,96 +358,98 @@ const App: React.FC = () => {
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Top Categorias</h3>
                 <div className="space-y-3">
-                   {(metrics?.categories || []).slice(0, 15).map((cat, idx) => (
-                     <div key={cat.name} className="flex items-center justify-between text-[11px] py-1 border-b border-slate-50">
-                        <span className="text-slate-600 font-bold truncate max-w-[150px]">{cat.name}</span>
-                        <div className="flex gap-4">
-                            <span className="font-black text-emerald-600 w-8 text-center">{cat.FRESH}</span>
-                            <span className="font-black text-indigo-600 w-8 text-center">{cat.BLIP}</span>
-                        </div>
-                     </div>
-                   ))}
+                  {(metrics?.categories || []).slice(0, 15).map((cat, idx) => (
+                    <div key={cat.name} className="flex items-center justify-between text-[11px] py-1 border-b border-slate-50">
+                      <span className="text-slate-600 font-bold truncate max-w-[150px]">{cat.name}</span>
+                      <div className="flex gap-4">
+                        <span className="font-black text-emerald-600 w-8 text-center">{cat.FRESH}</span>
+                        <span className="font-black text-indigo-600 w-8 text-center">{cat.BLIP}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
         ) : view === 'table' ? (
           <div className="pb-12 animate-in">
-             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <h3 className="font-black text-slate-800 text-sm uppercase">Lista Detalhada</h3>
-                  <div className="flex items-center gap-4">
-                    <span className="text-[10px] font-black text-[#3f2666] bg-[#3f2666]/10 px-3 py-1 rounded-full">{filteredData.length.toLocaleString()} Tickets</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1.5 hover:bg-slate-100 rounded-lg"><ChevronLeft size={16} /></button>
-                      <span className="text-[10px] font-black text-slate-400">{currentPage} / {totalPages}</span>
-                      <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1.5 hover:bg-slate-100 rounded-lg"><ChevronRight size={16} /></button>
-                    </div>
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 className="font-black text-slate-800 text-sm uppercase">Lista Detalhada</h3>
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] font-black text-[#3f2666] bg-[#3f2666]/10 px-3 py-1 rounded-full">{filteredData.length.toLocaleString()} Tickets</span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1.5 hover:bg-slate-100 rounded-lg"><ChevronLeft size={16} /></button>
+                    <span className="text-[10px] font-black text-slate-400">{currentPage} / {totalPages}</span>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1.5 hover:bg-slate-100 rounded-lg"><ChevronRight size={16} /></button>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-[#fcfdfe] text-slate-400 text-[9px] font-black uppercase tracking-widest border-b border-slate-100">
-                      <tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Canal</th><th className="px-6 py-4">Agente</th><th className="px-6 py-4">Categoria</th><th className="px-6 py-4">TMA</th><th className="px-6 py-4">Cliente</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 text-[11px]">
-                      {paginatedData.map((ticket, i) => (
-                        <tr key={i} className="hover:bg-slate-50">
-                          <td className="px-6 py-3 font-mono font-bold text-indigo-600">{ticket.numeroTicket}</td>
-                          <td className="px-6 py-3"><span className="px-2 py-0.5 rounded text-[8px] font-black bg-slate-100">{ticket.plataforma}</span></td>
-                          <td className="px-6 py-3 text-slate-700 font-bold uppercase">{ticket.agente}</td>
-                          <td className="px-6 py-3 text-slate-400 italic">{ticket.categoria}</td>
-                          <td className="px-6 py-3 font-mono text-slate-500">{ticket.ahtOriginal}</td>
-                          <td className="px-6 py-3 text-slate-400 font-bold truncate max-w-[150px]">{ticket.cliente || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-             </section>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-[#fcfdfe] text-slate-400 text-[9px] font-black uppercase tracking-widest border-b border-slate-100">
+                    <tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Canal</th><th className="px-6 py-4">Agente</th><th className="px-6 py-4">Categoria</th><th className="px-6 py-4">TMA</th><th className="px-6 py-4">Cliente</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-[11px]">
+                    {paginatedData.map((ticket, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-6 py-3 font-mono font-bold text-indigo-600">{ticket.numeroTicket}</td>
+                        <td className="px-6 py-3"><span className="px-2 py-0.5 rounded text-[8px] font-black bg-slate-100">{ticket.plataforma}</span></td>
+                        <td className="px-6 py-3 text-slate-700 font-bold uppercase">{ticket.agente}</td>
+                        <td className="px-6 py-3 text-slate-400 italic">{ticket.categoria}</td>
+                        <td className="px-6 py-3 font-mono text-slate-500">{ticket.ahtOriginal}</td>
+                        <td className="px-6 py-3 text-slate-400 font-bold truncate max-w-[150px]">{ticket.cliente || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         ) : (
           /* INSIGHTS VIEW */
           <div className="animate-in pb-12 max-w-4xl mx-auto">
-             <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-5"><Brain size={120} className="text-[#3f2666]" /></div>
-                <div className="flex items-center gap-4 mb-10">
-                   <div className="p-4 bg-amber-50 rounded-2xl"><Sparkles className="text-amber-500" size={32} /></div>
-                   <div>
-                      <h2 className="text-2xl font-black text-slate-800">Insights Estratégicos com IA</h2>
-                      <p className="text-slate-400 text-sm font-medium">Diagnóstico de eficiência e sugestões de melhoria.</p>
-                   </div>
+            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-5"><Brain size={120} className="text-[#3f2666]" /></div>
+              <div className="flex items-center gap-4 mb-10">
+                <div className="p-4 bg-amber-50 rounded-2xl"><Sparkles className="text-amber-500" size={32} /></div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-800">Insights Estratégicos com IA</h2>
+                  <p className="text-slate-400 text-sm font-medium">Diagnóstico de eficiência e sugestões de melhoria.</p>
                 </div>
-                {!insights ? (
-                   <div className="flex flex-col items-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                      <Target size={48} className="text-slate-200 mb-6" />
-                      <p className="text-slate-400 font-bold text-center max-w-sm mb-8">Baseado nos dados atuais, a IA irá gerar um plano de ação para otimizar seus KPIs.</p>
-                      <button disabled={isGeneratingInsights} onClick={generateAIInsights} className="flex items-center gap-3 px-8 py-4 bg-[#3f2666] text-white rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                         {isGeneratingInsights ? <><div className="loader border-white border-t-transparent"></div> Analisando...</> : <><Lightbulb size={20} /> Gerar Diagnóstico</>}
-                      </button>
-                   </div>
-                ) : (
-                   <div className="space-y-8 animate-in">
-                      <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed bg-slate-50 p-8 rounded-3xl border border-slate-100 whitespace-pre-wrap">
-                         {insights}
-                      </div>
-                      <div className="flex justify-center pt-6">
-                         <button onClick={() => { setInsights(''); generateAIInsights(); }} className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-[#3f2666]">
-                            <Target size={14} /> Recalcular Insights
-                         </button>
-                      </div>
-                   </div>
-                )}
-             </div>
+              </div>
+              {!insights ? (
+                <div className="flex flex-col items-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                  <Target size={48} className="text-slate-200 mb-6" />
+                  <p className="text-slate-400 font-bold text-center max-w-sm mb-8">Baseado nos dados atuais, a IA irá gerar um plano de ação para otimizar seus KPIs.</p>
+                  <button disabled={isGeneratingInsights} onClick={generateAIInsights} className="flex items-center gap-3 px-8 py-4 bg-[#3f2666] text-white rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+                    {isGeneratingInsights ? <><div className="loader border-white border-t-transparent"></div> Analisando...</> : <><Lightbulb size={20} /> Gerar Diagnóstico</>}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-8 animate-in">
+                  <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+                    <ReactMarkdown className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                      {insights}
+                    </ReactMarkdown>
+                  </div>
+                  <div className="flex justify-center pt-6">
+                    <button onClick={() => { setInsights(''); generateAIInsights(); }} className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black shadow-sm hover:bg-slate-50 hover:text-[#3f2666] hover:border-[#3f2666]/20 transition-all">
+                      <Target size={16} /> Recalcular Insights
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
 
       <footer className="bg-[#3f2666] py-16 mt-auto">
         <div className="max-w-7xl mx-auto px-6 flex flex-col items-center justify-center">
-           <div className="opacity-90">
-             <FooterLogo />
-           </div>
+          <div className="opacity-90">
+            <FooterLogo />
+          </div>
         </div>
       </footer>
     </div>
