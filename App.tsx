@@ -405,12 +405,15 @@ const App: React.FC = () => {
     try {
       // Usar a chave de API do ambiente
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      console.log('[IA] apiKey:', apiKey);
 
       if (!apiKey) {
+        console.error('[IA] API Key não encontrada no ambiente!');
         throw new Error('API Key não configurada. Verifique se o arquivo .env contém VITE_GEMINI_API_KEY');
       }
 
       const genAI = new GoogleGenAI(apiKey);
+      console.log('[IA] GoogleGenAI instanciado');
 
       // Encontrar categoria que consome mais tempo médio
       const catTimeSorted = [...(metrics?.categories || [])].sort((a, b) => (b.totalAHT / b.value) - (a.totalAHT / a.value));
@@ -450,20 +453,26 @@ const App: React.FC = () => {
 
       Dados para análise: ${summary}`;
 
+      console.log('[IA] Prompt enviado:', prompt);
+
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('[IA] Modelo Gemini instanciado');
       const result = await model.generateContent(prompt);
+      console.log('[IA] Resultado da IA:', result);
       const response = await result.response;
       const text = response.text();
+      console.log('[IA] Texto recebido:', text);
 
       // Remover code blocks se a IA colocá-los
       const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      console.log('[IA] JSON limpo:', cleanJson);
 
       try {
         const json = JSON.parse(cleanJson);
         setAiAnalysis(json);
       } catch (e) {
-        console.error("JSON Parse Error", e);
-        console.log("Resposta recebida:", text);
+        console.error('[IA] JSON Parse Error', e);
+        console.log('[IA] Resposta recebida:', text);
         setAiAnalysis({
           period_analysis: "Não foi possível estruturar a análise. Tente novamente.",
           team_performance: "-",
@@ -473,9 +482,9 @@ const App: React.FC = () => {
         });
       }
     } catch (err: any) {
-      console.error('Gemini API Error:', err);
+      console.error('[IA] Gemini API Error:', err);
       const errorMsg = err?.message || 'Erro desconhecido';
-      alert(`Erro ao conectar com a IA: ${errorMsg}\n\nVerifique:\n1. Se a chave de API está correta\n2. Se você reiniciou o servidor após alterar o .env\n3. Se a chave tem permissões para usar a API Gemini`);
+      alert(`Erro ao conectar com a IA: ${errorMsg}\n\nVerifique:\n1. Se a chave de API está correta\n2. Se você reiniciou o servidor após alterar o .env\n3. Se a chave tem permissões para usar a API Gemini\n4. Veja detalhes no console do navegador para diagnóstico.`);
     } finally {
       setIsGeneratingInsights(false);
     }
