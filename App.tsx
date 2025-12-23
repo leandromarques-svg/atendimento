@@ -142,19 +142,31 @@ const App: React.FC = () => {
       };
 
       // Page 1
+      // Page 1
       drawHeader(pdf);
       position = headerHeight + 5; // Start below header
-      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+
+      // Use JPEG with 0.8 quality for significant size reduction
+      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
       heightLeft -= (pdfHeight - position - margin); // Decrement used height
 
       // Subsequent Pages
       while (heightLeft > 0) {
         position -= (pdfHeight - margin); // Shift up
         pdf.addPage();
+        drawHeader(pdf); // Header on all pages
         // We shift the image up so the next chunk is visible
-        // We add a top margin on new pages as well
-        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
         heightLeft -= (pdfHeight - (margin * 2));
+      }
+
+      // Add Footer on the last page or all pages? Let's add simple page numbers for now
+      const pageCount = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.text('Página ' + i + ' de ' + pageCount, pdf.internal.pageSize.width - margin, pdf.internal.pageSize.height - 10, { align: 'right' });
       }
 
       pdf.save(`relatorio-atendimento-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -762,186 +774,356 @@ const App: React.FC = () => {
               </div>
             </section>
           </div>
-        ) : view === 'agents' ? (
-          /* AGENTS VIEW */
-          <div className="space-y-8 pb-12">
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-2xl border border-purple-200">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white rounded-xl shadow-sm">
-                  <Users className="text-purple-600" size={28} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-slate-800">Análise de Performance por Agente</h2>
-                  <p className="text-slate-600 text-sm font-medium">Velocidade de atendimento e satisfação do cliente (CSAT)</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* TMA por Agente */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
-                  <Clock size={14} /> Tempo Médio de Atendimento (TMA)
-                </h3>
-                <div style={{ height: Math.max(400, agentPerformance.length * 40) + 'px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={agentPerformance} margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" hide />
-                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        cursor={{ fill: '#f8fafc' }}
-                        formatter={(value: any) => formatSecondsToTime(value)}
-                      />
-                      <Bar dataKey="avgAHT" name="TMA Médio" radius={[0, 4, 4, 0]} barSize={20}>
-                        {agentPerformance.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* TMR por Agente */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
-                  <Activity size={14} /> Tempo Médio de 1ª Resposta (TMR)
-                </h3>
-                <div style={{ height: Math.max(400, agentPerformance.length * 40) + 'px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={agentPerformance} margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" hide />
-                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        cursor={{ fill: '#f8fafc' }}
-                        formatter={(value: any) => formatSecondsToTime(value)}
-                      />
-                      <Bar dataKey="avgFRT" name="TMR Médio" radius={[0, 4, 4, 0]} barSize={20} fill="#10b981" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabela de Performance com CSAT */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-100">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Target size={14} /> Ranking de Performance e Satisfação
-                </h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-4 text-left">Posição</th>
-                      <th className="px-6 py-4 text-left">Agente</th>
-                      <th className="px-6 py-4 text-center">Total Tickets</th>
-                      <th className="px-6 py-4 text-center">TMA Médio</th>
-                      <th className="px-6 py-4 text-center">TMR Médio</th>
-                      <th className="px-6 py-4 text-center">CSAT Médio</th>
-                      <th className="px-6 py-4 text-center">Avaliações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 text-[11px]">
-                    {agentPerformance.map((agent, index) => (
-                      <tr key={index} className="hover:bg-slate-50">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {index === 0 && <span className="text-xl">🥇</span>}
-                            {index === 1 && <span className="text-xl">🥈</span>}
-                            {index === 2 && <span className="text-xl">🥉</span>}
-                            <span className="font-bold text-slate-600">#{index + 1}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-slate-800 uppercase">{agent.name}</td>
-                        <td className="px-6 py-4 text-center text-slate-600 font-mono">{agent.total}</td>
-                        <td className="px-6 py-4 text-center font-mono text-emerald-600 font-bold">{formatSecondsToTime(agent.avgAHT)}</td>
-                        <td className="px-6 py-4 text-center font-mono text-blue-600">{formatSecondsToTime(agent.avgFRT)}</td>
-                        <td className="px-6 py-4 text-center">
-                          {agent.avgCSAT > 0 ? (
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="font-bold text-amber-600">{agent.avgCSAT.toFixed(1)}</span>
-                              <span className="text-amber-400">⭐</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-300 text-xs">Sem avaliações</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center text-slate-500 text-xs">{agent.csatCount} avaliações</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         ) : (
-          /* INSIGHTS VIEW */
-          <div className="animate-in pb-12 max-w-4xl mx-auto">
-            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5"><Brain size={120} className="text-[#3f2666]" /></div>
-              <div className="flex items-center gap-4 mb-10">
-                <div className="p-4 bg-amber-50 rounded-2xl"><Sparkles className="text-amber-500" size={32} /></div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-800">Insights Estratégicos com IA</h2>
-                  <p className="text-slate-400 text-sm font-medium">Diagnóstico de eficiência e sugestões de melhoria.</p>
-                </div>
-              </div>
-              {!aiAnalysis ? (
-                <div className="flex flex-col items-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200 relative z-10">
-                  <Target size={48} className="text-slate-200 mb-6" />
-                  <p className="text-slate-400 font-bold text-center max-w-sm mb-8">Baseado nos dados atuais, a IA irá gerar um plano de ação para otimizar seus KPIs.</p>
-                  <button disabled={isGeneratingInsights} onClick={generateAIInsights} className="flex items-center gap-3 px-8 py-4 bg-[#3f2666] text-white rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                    {isGeneratingInsights ? <><div className="loader border-white border-t-transparent"></div> Analisando Dados...</> : <><Lightbulb size={20} /> Gerar Diagnóstico</>}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-8 animate-in relative z-10">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Calendar size={14} /> Análise de Período</h3>
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.period_analysis}</p>
+          /* DASHBOARD VIEW + AGENTS VIEW (if exporting) */
+          <>
+            {(view === 'dashboard' || isExporting) && (
+              <div className="space-y-8 pb-12">
+                <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                  <StatCard title="Total Tickets" value={filteredData.length} icon={<Ticket className="text-[#3f2666]" size={18} />} subValue="Volume processado" />
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col relative overflow-hidden group hover:shadow-md transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Filas Ativas</p>
+                        <h4 className="text-3xl font-black text-slate-800 mt-1">{queueMetrics.length}</h4>
+                      </div>
+                      <div className="p-3 bg-purple-50 rounded-xl">
+                        <Tag className="text-purple-500" size={18} />
+                      </div>
                     </div>
-                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14} /> Performance de Time</h3>
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.team_performance}</p>
-                    </div>
-                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Activity size={14} /> Gargalos (Categorias)</h3>
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.bottlenecks}</p>
-                    </div>
-                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Clock size={14} /> Mapa de Calor</h3>
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.heatmap_analysis}</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100">
-                    <h3 className="text-sm font-black text-emerald-800 uppercase tracking-widest mb-6 flex items-center gap-2"><Target size={18} /> Plano de Ação Recomendado</h3>
-                    <div className="grid gap-4">
-                      {aiAnalysis.action_plan?.map((action: string, idx: number) => (
-                        <div key={idx} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-black text-sm shrink-0">{idx + 1}</div>
-                          <p className="text-sm text-slate-700 font-medium pt-1.5">{action}</p>
+                    <div className="space-y-2 mt-auto max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                      {queueMetrics.map((q, i) => (
+                        <div key={i} className="flex justify-between items-center text-[10px] border-b border-slate-50 last:border-0 pb-1">
+                          <span className="font-bold text-slate-600 truncate max-w-[100px]" title={q.name}>{q.name}</span>
+                          <span className="text-slate-400 font-mono bg-slate-50 px-1.5 py-0.5 rounded">{q.total}</span>
                         </div>
                       ))}
                     </div>
                   </div>
+                  <StatCard title="TMA Médio" value={metrics ? formatSecondsToTime(metrics.avgAHT) : '00:00:00'} icon={<Clock className="text-emerald-500" size={18} />} subValue="Tempo Atendimento" />
+                  <StatCard title="TMR Médio" value={metrics ? formatSecondsToTime(metrics.avgFRT) : '00:00:00'} icon={<Activity className="text-blue-500" size={18} />} subValue="Tempo Resposta" />
+                  <StatCard title="Agentes" value={metrics ? metrics.agents.length : 0} icon={<Users className="text-amber-500" size={18} />} subValue="Ativos no período" />
+                </section>
 
-                  <div className="flex justify-center pt-6">
-                    <button onClick={() => { setAiAnalysis(null); generateAIInsights(); }} className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black shadow-sm hover:bg-slate-50 hover:text-[#3f2666] hover:border-[#3f2666]/20 transition-all">
-                      <Target size={16} /> Recalcular Insights
-                    </button>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <section className="lg:col-span-2 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-2">
+                      <TrendingUp size={16} /> Evolução Mensal de Volume
+                    </h3>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={monthlyEvolutionData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                          <Tooltip />
+                          <Area type="monotone" dataKey="FRESH_count" name="Freshdesk" stroke={FRESH_COLOR} fill={FRESH_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'BLIP'} />
+                          <Area type="monotone" dataKey="BLIP_count" name="Blip" stroke={BLIP_COLOR} fill={BLIP_COLOR} fillOpacity={0.1} strokeWidth={3} hide={platformFilter === 'FRESH'} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+
+                  <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <Activity size={14} /> Mapa de Calor Semanal
+                    </h3>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex text-[9px] text-slate-400 font-bold mb-1 pl-8">
+                        <span className="flex-1 text-center">00h</span>
+                        <span className="flex-1 text-center">06h</span>
+                        <span className="flex-1 text-center">12h</span>
+                        <span className="flex-1 text-center">18h</span>
+                      </div>
+                      {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, dayIdx) => (
+                        <div key={d} className="flex items-center gap-1">
+                          <div className="w-8 text-[9px] font-bold text-slate-500">{d}</div>
+                          <div className="flex-1 grid gap-px" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
+                            {heatmapData.grid[dayIdx].map((val, hourIdx) => {
+                              const opacity = heatmapData.max > 0 ? (val / heatmapData.max) : 0;
+                              return (
+                                <div
+                                  key={hourIdx}
+                                  className="h-6 rounded-sm transition-all hover:scale-125 cursor-help"
+                                  style={{
+                                    backgroundColor: BRAND_COLOR,
+                                    opacity: Math.max(0.05, opacity),
+                                    flex: 1
+                                  }}
+                                  title={`${d} ${hourIdx}h: ${val} tickets`}
+                                ></div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center mt-3">
+                        <span className="text-[9px] text-slate-400">Menor Volume</span>
+                        <div className="flex gap-1">
+                          {[0.1, 0.3, 0.6, 1].map(o => <div key={o} style={{ opacity: o }} className="w-4 h-4 bg-[#3f2666] rounded-sm"></div>)}
+                        </div>
+                        <span className="text-[9px] text-slate-400">Maior Volume</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Performance por Agente (Volume)</h3>
+                    <div style={{ height: Math.max(400, (metrics?.agents.length || 0) * 35) + 'px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={metrics?.agents || []} layout="vertical">
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 10, fill: '#64748b' }} />
+                          <Tooltip />
+                          <Bar name="Freshdesk" dataKey="Freshdesk" stackId="a" fill={FRESH_COLOR} barSize={14} hide={platformFilter === 'BLIP'} />
+                          <Bar name="Blip" dataKey="Blip" stackId="a" fill={BLIP_COLOR} barSize={14} hide={platformFilter === 'FRESH'} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest">Participação por Categoria</h3>
+                    <div className="flex-1 min-h-[300px]">
+                      <div className="h-full overflow-y-auto pr-2 custom-scrollbar">
+                        <div style={{ height: Math.max(400, (metrics?.categories.length || 0) * 35) + 'px' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              layout="vertical"
+                              data={metrics?.categories || []}
+                              margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                              <XAxis type="number" hide />
+                              <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                              <Tooltip
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                cursor={{ fill: '#f8fafc' }}
+                              />
+                              <Bar dataKey="value" name="Volume" radius={[0, 4, 4, 0]} barSize={16}>
+                                {(metrics?.categories || []).map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
+
+            {(view === 'agents' || isExporting) && (
+              <div className={`space-y-8 pb-12 ${isExporting ? 'mt-8 border-t border-slate-200 pt-8' : ''}`}>
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-2xl border border-purple-200">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white rounded-xl shadow-sm">
+                      <Users className="text-purple-600" size={28} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-slate-800">Análise de Performance por Agente</h2>
+                      <p className="text-slate-600 text-sm font-medium">Velocidade de atendimento e satisfação do cliente (CSAT)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* TMA por Agente */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
+                      <Clock size={14} /> Tempo Médio de Atendimento (TMA)
+                    </h3>
+                    <div style={{ height: Math.max(400, agentPerformance.length * 40) + 'px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={agentPerformance} layout="vertical" margin={{ left: 40, right: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f8fafc" />
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100">
+                                    <p className="font-bold text-slate-800 mb-1">{payload[0].payload.name}</p>
+                                    <p className="text-emerald-600 font-mono text-sm">
+                                      {formatSecondsToTime(payload[0].value as number)}
+                                    </p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="avgAHT" radius={[0, 4, 4, 0]} barSize={20}>
+                            {agentPerformance.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} fillOpacity={0.8} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* TMR por Agente */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="text-[11px] font-black text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
+                      <Activity size={14} /> Tempo Médio de 1ª Resposta (TMR)
+                    </h3>
+                    <div style={{ height: Math.max(400, agentPerformance.length * 40) + 'px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={agentPerformance} layout="vertical" margin={{ left: 40, right: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f8fafc" />
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100">
+                                    <p className="font-bold text-slate-800 mb-1">{payload[0].payload.name}</p>
+                                    <p className="text-blue-600 font-mono text-sm">
+                                      {formatSecondsToTime(payload[0].value as number)}
+                                    </p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="avgFRT" radius={[0, 4, 4, 0]} barSize={20} fill="#3b82f6" fillOpacity={0.2} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela de Ranking */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-8">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Ranking de Performance e Satisfação</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                        <tr>
+                          <th className="px-6 py-4 w-16">Rank</th>
+                          <th className="px-6 py-4">Agente</th>
+                          <th className="px-6 py-4 text-center">Tickets</th>
+                          <th className="px-6 py-4">TMA Médio</th>
+                          <th className="px-6 py-4">TMR Médio</th>
+                          <th className="px-6 py-4 text-center">CSAT (1-5)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-xs">
+                        {agentPerformance.map((agent, index) => (
+                          <tr key={index} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black ${index === 0 ? 'bg-amber-100 text-amber-600' :
+                                index === 1 ? 'bg-slate-200 text-slate-600' :
+                                  index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-slate-50 text-slate-400'
+                                }`}>
+                                {index + 1}º
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-700">{agent.name}</td>
+                            <td className="px-6 py-4 text-center font-mono text-slate-500">{agent.total}</td>
+                            <td className="px-6 py-4 font-mono font-bold text-emerald-600">{formatSecondsToTime(agent.avgAHT)}</td>
+                            <td className="px-6 py-4 font-mono text-blue-500">{formatSecondsToTime(agent.avgFRT)}</td>
+                            <td className="px-6 py-4 text-center">
+                              {agent.csatCount > 0 ? (
+                                <div className="flex flex-col items-center">
+                                  <div className="flex items-center text-amber-400 gap-0.5">
+                                    <span className="font-bold text-slate-700 mr-1">{agent.avgCSAT.toFixed(1)}</span>
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                      <svg key={i} className={`w-3 h-3 ${i < Math.round(agent.avgCSAT) ? 'fill-current' : 'text-slate-200 fill-current'}`} viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                    ))}
+                                  </div>
+                                  <span className="text-[9px] text-slate-400 mt-0.5">({agent.csatCount} avaliações)</span>
+                                </div>
+                              ) : <span className="text-slate-300">-</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isExporting && (
+              <div className="mt-12 flex justify-center opacity-50 grayscale">
+                <FooterLogo />
+              </div>
+            )}
+          </>
+        ) : (
+        /* INSIGHTS VIEW */
+        <div className="animate-in pb-12 max-w-4xl mx-auto">
+          <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5"><Brain size={120} className="text-[#3f2666]" /></div>
+            <div className="flex items-center gap-4 mb-10">
+              <div className="p-4 bg-amber-50 rounded-2xl"><Sparkles className="text-amber-500" size={32} /></div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-800">Insights Estratégicos com IA</h2>
+                <p className="text-slate-400 text-sm font-medium">Diagnóstico de eficiência e sugestões de melhoria.</p>
+              </div>
             </div>
+            {!aiAnalysis ? (
+              <div className="flex flex-col items-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200 relative z-10">
+                <Target size={48} className="text-slate-200 mb-6" />
+                <p className="text-slate-400 font-bold text-center max-w-sm mb-8">Baseado nos dados atuais, a IA irá gerar um plano de ação para otimizar seus KPIs.</p>
+                <button disabled={isGeneratingInsights} onClick={generateAIInsights} className="flex items-center gap-3 px-8 py-4 bg-[#3f2666] text-white rounded-2xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
+                  {isGeneratingInsights ? <><div className="loader border-white border-t-transparent"></div> Analisando Dados...</> : <><Lightbulb size={20} /> Gerar Diagnóstico</>}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8 animate-in relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Calendar size={14} /> Análise de Período</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.period_analysis}</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14} /> Performance de Time</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.team_performance}</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Activity size={14} /> Gargalos (Categorias)</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.bottlenecks}</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Clock size={14} /> Mapa de Calor</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">{aiAnalysis.heatmap_analysis}</p>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100">
+                  <h3 className="text-sm font-black text-emerald-800 uppercase tracking-widest mb-6 flex items-center gap-2"><Target size={18} /> Plano de Ação Recomendado</h3>
+                  <div className="grid gap-4">
+                    {aiAnalysis.action_plan?.map((action: string, idx: number) => (
+                      <div key={idx} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-emerald-100 shadow-sm">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-black text-sm shrink-0">{idx + 1}</div>
+                        <p className="text-sm text-slate-700 font-medium pt-1.5">{action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-center pt-6">
+                  <button onClick={() => { setAiAnalysis(null); generateAIInsights(); }} className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black shadow-sm hover:bg-slate-50 hover:text-[#3f2666] hover:border-[#3f2666]/20 transition-all">
+                    <Target size={16} /> Recalcular Insights
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
         )}
       </main>
 
