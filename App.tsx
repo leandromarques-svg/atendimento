@@ -190,9 +190,28 @@ const App: React.FC = () => {
     return Array.from(q).sort();
   }, [data]);
 
+  const dataFilteredForClients = useMemo(() => {
+    return data.filter(d => {
+      const matchesSearch = (d.cliente || '').toLowerCase().includes(searchTerm.toLowerCase()) || d.agente.toLowerCase().includes(searchTerm.toLowerCase()) || d.numeroTicket.includes(searchTerm);
+      const matchesPlatform = platformFilter === 'ALL' || d.plataforma === platformFilter;
+      const matchesCategory = selectedCategory === 'ALL' || d.categoria === selectedCategory;
+      const matchesAgent = selectedAgent === 'ALL' || d.agente === selectedAgent;
+      const matchesQueue = selectedQueue === 'ALL' || d.fila === selectedQueue;
+      const matchesYear = selectedYear === 'ALL' || d.dataObj.getFullYear().toString() === selectedYear;
+      const matchesMonth = selectedMonth === 'ALL' || d.dataObj.getMonth().toString() === selectedMonth;
+
+      const ticketDate = d.dataObj;
+      const start = dateStart ? new Date(dateStart + 'T00:00:00') : null;
+      const end = dateEnd ? new Date(dateEnd + 'T23:59:59') : null;
+      const matchesDate = (!start || ticketDate >= start) && (!end || ticketDate <= end);
+
+      return matchesSearch && matchesPlatform && matchesCategory && matchesAgent && matchesQueue && matchesDate && matchesYear && matchesMonth;
+    });
+  }, [data, searchTerm, platformFilter, selectedCategory, selectedAgent, selectedQueue, dateStart, dateEnd, selectedYear, selectedMonth]);
+
   const top10Clients = useMemo(() => {
     const clientCount: Record<string, number> = {};
-    data.forEach(d => {
+    dataFilteredForClients.forEach(d => {
       if (d.cliente) {
         clientCount[d.cliente] = (clientCount[d.cliente] || 0) + 1;
       }
@@ -201,7 +220,7 @@ const App: React.FC = () => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name]) => name);
-  }, [data]);
+  }, [dataFilteredForClients]);
 
   const filteredData = useMemo(() => {
     return data.filter(d => {
@@ -362,7 +381,9 @@ const App: React.FC = () => {
         ? stats.csatScores.reduce((a, b) => a + b, 0) / stats.csatScores.length
         : 0,
       csatCount: stats.csatScores.length
-    })).sort((a, b) => a.avgAHT - b.avgAHT); // Mais rápido primeiro
+    }))
+      .filter(a => a.avgAHT > 0)
+      .sort((a, b) => a.avgAHT - b.avgAHT); // Mais rápido primeiro
   }, [filteredData]);
 
   const generateAIInsights = async () => {
@@ -546,7 +567,25 @@ const App: React.FC = () => {
           <div className="space-y-8 pb-12">
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <StatCard title="Total Tickets" value={filteredData.length} icon={<Ticket className="text-[#3f2666]" size={18} />} subValue="Volume processado" />
-              <StatCard title="Filas Ativas" value={queueMetrics.length} icon={<Tag className="text-purple-500" size={18} />} subValue="Total de filas" />
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col relative overflow-hidden group hover:shadow-md transition-all">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Filas Ativas</p>
+                    <h4 className="text-3xl font-black text-slate-800 mt-1">{queueMetrics.length}</h4>
+                  </div>
+                  <div className="p-3 bg-purple-50 rounded-xl">
+                    <Tag className="text-purple-500" size={18} />
+                  </div>
+                </div>
+                <div className="space-y-2 mt-auto max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                  {queueMetrics.map((q, i) => (
+                    <div key={i} className="flex justify-between items-center text-[10px] border-b border-slate-50 last:border-0 pb-1">
+                      <span className="font-bold text-slate-600 truncate max-w-[100px]" title={q.name}>{q.name}</span>
+                      <span className="text-slate-400 font-mono bg-slate-50 px-1.5 py-0.5 rounded">{q.total}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <StatCard title="TMA Médio" value={metrics ? formatSecondsToTime(metrics.avgAHT) : '00:00:00'} icon={<Clock className="text-emerald-500" size={18} />} subValue="Tempo Atendimento" />
               <StatCard title="TMR Médio" value={metrics ? formatSecondsToTime(metrics.avgFRT) : '00:00:00'} icon={<Activity className="text-blue-500" size={18} />} subValue="Tempo Resposta" />
               <StatCard title="Agentes" value={metrics ? metrics.agents.length : 0} icon={<Users className="text-amber-500" size={18} />} subValue="Ativos no período" />
