@@ -1,0 +1,3 @@
+npm install
+cd api && npm install && cd ..
+npm run start:all
